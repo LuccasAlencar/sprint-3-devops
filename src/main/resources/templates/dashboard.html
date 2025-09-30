@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="pt-br" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" 
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security" layout:decorate="~{layout/layout}">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard - Sistema Mottu</title>
+</head>
+<body>
+
+<div layout:fragment="content">
+    <h1 class="text-center my-4">Sistema Mottu</h1>
+
+    <div class="row">
+        <div class="col-md-7">
+            <div class="card bg-dark text-white border-success">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Motos</h5>
+                    <div sec:authorize="hasRole('ADMIN')">
+                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#motoModal" data-action="add">Adicionar</button>
+                    </div>
+                </div>
+                <div class="card-body" style="height: 500px; overflow-y: auto;">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th scope="col">Identificação</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="moto : ${motos}" th:data-moto-id="${moto.id}"
+                                th:data-moto-placa="${moto.placa}"
+                                th:data-moto-chassi="${moto.chassi}"
+                                th:data-moto-qrcode="${moto.qrCode}"
+                                th:data-moto-data-entrada="${moto.dataEntrada}"
+                                th:data-moto-previsao-entrega="${moto.previsaoEntrega}"
+                                th:data-moto-observacoes="${moto.observacoes}"
+                                th:data-moto-zona-id="${moto.zona?.id}"
+                                th:data-moto-patio-id="${moto.patio?.id}"
+                                th:data-moto-status-id="${moto.status?.id}">
+                                <td>
+                                    <div th:text="${moto.identificacao}"></div>
+                                    <small class="text-muted" th:text="'(' + ${moto.tipoIdentificacao} + ')'"></small>
+                                </td>
+                                <td th:text="${moto.status?.nome}"></td>
+                                <td>
+                                    <div sec:authorize="hasRole('ADMIN')">
+                                        <button class="btn btn-warning btn-sm edit-btn" data-bs-toggle="modal" data-bs-target="#motoModal" data-action="edit">Editar</button>
+                                        <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#moverMotoModal" th:data-moto-id="${moto.id}">Mover</button>
+                                        <button class="btn btn-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#alterarStatusModal" th:data-moto-id="${moto.id}">Status</button>
+                                        <a th:href="@{/moto/delete/{id}(id=${moto.id})}" class="btn btn-danger btn-sm delete-btn">Excluir</a>
+                                    </div>
+                                    <div sec:authorize="hasRole('OPERADOR')">
+                                        <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#moverMotoModal" th:data-moto-id="${moto.id}">Mover</button>
+                                        <button class="btn btn-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#alterarStatusModal" th:data-moto-id="${moto.id}">Status</button>
+                                        <span class="text-muted">(Operador)</span>
+                                    </div>
+                                    <div sec:authorize="hasRole('USER')">
+                                        <span class="text-muted">Apenas visualização</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-5">
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card bg-dark text-white border-success">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Pátios</h6>
+                            <div sec:authorize="hasRole('ADMIN')">
+                                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#patioModal" data-action="add">Adicionar</button>
+                            </div>
+                        </div>
+                        <div class="card-body" style="height: 150px; overflow-y: auto;">
+                            <table class="table table-dark table-hover">
+                                <thead><tr><th>Nome</th><th>Ações</th></tr></thead>
+                                <tbody>
+                                    <tr th:each="patio : ${patios}" th:data-patio-id="${patio.id}" th:data-patio-nome="${patio.nome}">
+                                        <td th:text="${patio.nome}"></td>
+                                        <td>
+                                            <div sec:authorize="hasRole('ADMIN')">
+                                                <button class="btn btn-warning btn-sm edit-patio-btn" data-bs-toggle="modal" data-bs-target="#patioModal" data-action="edit">Editar</button>
+                                                <a th:href="@{/patio/delete/{id}(id=${patio.id})}" class="btn btn-danger btn-sm delete-btn">Excluir</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 mb-4">
+                    <div class="card bg-dark text-white border-success">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Zonas</h6>
+                            <div sec:authorize="hasRole('ADMIN')">
+                                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#zonaModal" data-action="add">Adicionar</button>
+                            </div>
+                        </div>
+                        <div class="card-body" style="height: 150px; overflow-y: auto;">
+                            <table class="table table-dark table-hover">
+                                <thead><tr><th>Nome</th><th>Ações</th></tr></thead>
+                                <tbody>
+                                    <tr th:each="zona : ${zonas}" th:data-zona-id="${zona.id}" th:data-zona-nome="${zona.nome}" th:data-zona-letra="${zona.letra}">
+                                        <td th:text="${zona.nome}"></td>
+                                        <td>
+                                            <div sec:authorize="hasRole('ADMIN')">
+                                                <button class="btn btn-warning btn-sm edit-zona-btn" data-bs-toggle="modal" data-bs-target="#zonaModal" data-action="edit">Editar</button>
+                                                <a th:href="@{/zona/delete/{id}(id=${zona.id})}" class="btn btn-danger btn-sm delete-btn">Excluir</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 mb-4">
+                    <div class="card bg-dark text-white border-success">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Status</h6>
+                            <div sec:authorize="hasRole('ADMIN')">
+                                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#statusModal" data-action="add">Adicionar</button>
+                            </div>
+                        </div>
+                        <div class="card-body" style="height: 150px; overflow-y: auto;">
+                            <table class="table table-dark table-hover">
+                                <thead><tr><th>Nome</th><th>Ações</th></tr></thead>
+                                <tbody>
+                                    <tr th:each="status : ${statusList}" th:data-status-id="${status.id}" th:data-status-nome="${status.nome}" th:data-status-grupo-id="${status.statusGrupo?.id}">
+                                        <td th:text="${status.nome}"></td>
+                                        <td>
+                                            <div sec:authorize="hasRole('ADMIN')">
+                                                <button class="btn btn-warning btn-sm edit-status-btn" data-bs-toggle="modal" data-bs-target="#statusModal" data-action="edit">Editar</button>
+                                                <a th:href="@{/status/delete/{id}(id=${status.id})}" class="btn btn-danger btn-sm delete-btn">Excluir</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 mb-4">
+                    <div class="card bg-dark text-white border-success">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Grupos</h6>
+                            <div sec:authorize="hasRole('ADMIN')">
+                                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#statusGrupoModal" data-action="add">Adicionar</button>
+                            </div>
+                        </div>
+                        <div class="card-body" style="height: 150px; overflow-y: auto;">
+                            <table class="table table-dark table-hover">
+                                <thead><tr><th>Nome</th><th>Ações</th></tr></thead>
+                                <tbody>
+                                    <tr th:each="grupo : ${grupos}" th:data-grupo-id="${grupo.id}" th:data-grupo-nome="${grupo.nome}">
+                                        <td th:text="${grupo.nome}"></td>
+                                        <td>
+                                            <div sec:authorize="hasRole('ADMIN')">
+                                                <button class="btn btn-warning btn-sm edit-grupo-btn" data-bs-toggle="modal" data-bs-target="#statusGrupoModal" data-action="edit">Editar</button>
+                                                <a th:href="@{/status-grupo/delete/{id}(id=${grupo.id})}" class="btn btn-danger btn-sm delete-btn">Excluir</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="motoModal" tabindex="-1" aria-labelledby="motoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="motoModalLabel">Adicionar Nova Moto</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form th:action="@{/moto/save}" method="post" id="motoForm">
+                        <input type="hidden" id="motoId" name="id">
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="placa" class="form-label">Placa</label>
+                                <input type="text" class="form-control" id="placa" name="placa">
+                                <small class="form-text text-muted">Preencha pelo menos um dos três: Placa, Chassi ou QR Code</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="chassi" class="form-label">Chassi</label>
+                                <input type="text" class="form-control" id="chassi" name="chassi">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="qrCode" class="form-label">QR Code</label>
+                                <input type="text" class="form-control" id="qrCode" name="qrCode">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="previsaoEntrega" class="form-label">Previsão de Entrega</label>
+                                <input type="date" class="form-control" id="previsaoEntrega" name="previsaoEntrega">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="observacoes" class="form-label">Observações</label>
+                            <textarea class="form-control" id="observacoes" name="observacoes" rows="3"></textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="zonaId" class="form-label">Zona</label>
+                                <select class="form-select" id="zonaId" name="zonaId" required>
+                                    <option value="">Selecione a Zona</option>
+                                    <option th:each="zona : ${zonas}" th:value="${zona.id}" th:text="${zona.nome}"></option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="patioId" class="form-label">Pátio</label>
+                                <select class="form-select" id="patioId" name="patioId" required>
+                                    <option value="">Selecione o Pátio</option>
+                                    <option th:each="patio : ${patios}" th:value="${patio.id}" th:text="${patio.nome}"></option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="statusId" class="form-label">Status</label>
+                                <select class="form-select" id="statusId" name="statusId" required>
+                                    <option value="">Selecione o Status</option>
+                                    <option th:each="status : ${statusList}" th:value="${status.id}" th:text="${status.nome}"></option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="submit" form="motoForm" class="btn btn-primary">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="patioModal" tabindex="-1" aria-labelledby="patioModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="patioModalLabel">Adicionar Pátio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form th:action="@{/patio/save}" method="post" id="patioForm">
+                        <input type="hidden" id="patioIdHidden" name="id">
+                        <div class="mb-3">
+                            <label for="patioNomeInput" class="form-label">Nome</label>
+                            <input type="text" class="form-control" id="patioNomeInput" name="nome" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="submit" form="patioForm" class="btn btn-primary">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="zonaModal" tabindex="-1" aria-labelledby="zonaModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="zonaModalLabel">Adicionar Zona</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form th:action="@{/zona/save}" method="post" id="zonaForm">
+                        <input type="hidden" id="zonaIdHidden" name="id">
+                        <div class="mb-3">
+                            <label for="zonaNomeInput" class="form-label">Nome</label>
+                            <input type="text" class="form-control" id="zonaNomeInput" name="nome" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="zonaLetraInput" class="form-label">Letra</label>
+                            <input type="text" class="form-control" id="zonaLetraInput" name="letra" maxlength="1" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="submit" form="zonaForm" class="btn btn-primary">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="statusModalLabel">Adicionar Status</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form th:action="@{/status/save}" method="post" id="statusForm">
+                        <input type="hidden" id="statusIdHidden" name="id">
+                        <div class="mb-3">
+                            <label for="statusNomeInput" class="form-label">Nome</label>
+                            <input type="text" class="form-control" id="statusNomeInput" name="nome" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="statusGrupoSelect" class="form-label">Grupo</label>
+                            <select class="form-select" id="statusGrupoSelect" name="statusGrupoId" required>
+                                <option value="">Selecione o Grupo</option>
+                                <option th:each="grupo : ${grupos}" th:value="${grupo.id}" th:text="${grupo.nome}"></option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="submit" form="statusForm" class="btn btn-primary">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="statusGrupoModal" tabindex="-1" aria-labelledby="statusGrupoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="statusGrupoModalLabel">Adicionar Grupo</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form th:action="@{/status-grupo/save}" method="post" id="statusGrupoForm">
+                        <input type="hidden" id="statusGrupoIdHidden" name="id">
+                        <div class="mb-3">
+                            <label for="statusGrupoNomeInput" class="form-label">Nome</label>
+                            <input type="text" class="form-control" id="statusGrupoNomeInput" name="nome" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="submit" form="statusGrupoForm" class="btn btn-primary">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="moverMotoModal" tabindex="-1" aria-labelledby="moverMotoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="moverMotoModalLabel">Mover Moto</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form th:action="@{/moto/move}" method="post" id="moverMotoForm">
+                        <input type="hidden" id="motoIdMove" name="motoId">
+                        
+                        <div class="mb-3">
+                            <label for="novoPatioId" class="form-label">Novo Pátio</label>
+                            <select class="form-select" id="novoPatioId" name="novoPatioId" required>
+                                <option value="">Selecione o Pátio</option>
+                                <option th:each="patio : ${patios}" th:value="${patio.id}" th:text="${patio.nome}"></option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="novaZonaId" class="form-label">Nova Zona</label>
+                            <select class="form-select" id="novaZonaId" name="novaZonaId" required>
+                                <option value="">Selecione a Zona</option>
+                                <option th:each="zona : ${zonas}" th:value="${zona.id}" th:text="${zona.nome}"></option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" form="moverMotoForm" class="btn btn-primary">Mover Moto</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="alterarStatusModal" tabindex="-1" aria-labelledby="alterarStatusModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="alterarStatusModalLabel">Alterar Status</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form th:action="@{/moto/change-status}" method="post" id="alterarStatusForm">
+                        <input type="hidden" id="motoIdStatus" name="motoId">
+                        
+                        <div class="mb-3">
+                            <label for="novoStatusId" class="form-label">Novo Status</label>
+                            <select class="form-select" id="novoStatusId" name="novoStatusId" required>
+                                <option value="">Selecione o Status</option>
+                                <option th:each="status : ${statusList}" th:value="${status.id}" th:text="${status.nome}"></option>
+                            </select>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <small>
+                                <strong>Regras de negócio:</strong><br>
+                                • Motos entregues não podem ter status alterado<br>
+                                • Motos em reparo só podem ir para "Pronta para Entrega" ou "Necessita Reparo"
+                            </small>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" form="alterarStatusForm" class="btn btn-primary">Alterar Status</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+</div>
+
+<div layout:fragment="scripts">
+    <script th:src="@{/js/dashboard.js}"></script>
+</div>
+
+</body>
+</html>

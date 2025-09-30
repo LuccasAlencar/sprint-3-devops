@@ -1,0 +1,130 @@
+/* Dashboard Custom Styles */
+
+body {
+    background-color: #1a1a1a;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.container {
+    max-width: 1400px;
+}
+
+/* Cards com tema escuro */
+.card {
+    border: 1px solid #28a745;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.card-header {
+    background-color: #333;
+    border-bottom: 1px solid #28a745;
+}
+
+/* Tabelas */
+.table-dark {
+    --bs-table-bg: #2c2c2c;
+}
+
+.table-hover > tbody > tr:hover {
+    background-color: rgba(40, 167, 69, 0.1);
+}
+
+/* Botões */
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-warning {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #212529;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+/* Scrollbar customizada */
+.card-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.card-body::-webkit-scrollbar-track {
+    background: #2c2c2c;
+}
+
+.card-body::-webkit-scrollbar-thumb {
+    background: #28a745;
+    border-radius: 4px;
+}
+
+.card-body::-webkit-scrollbar-thumb:hover {
+    background: #34ce57;
+}
+
+/* Modal customização */
+.modal-content {
+    border: 1px solid #28a745;
+}
+
+.form-control, .form-select {
+    background-color: #2c2c2c;
+    border: 1px solid #28a745;
+    color: #fff;
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: #2c2c2c;
+    border-color: #34ce57;
+    color: #fff;
+    box-shadow: 0 0 0 0.25rem rgba(40, 167, 69, 0.25);
+}
+
+/* Alertas */
+.alert-success {
+    background-color: rgba(40, 167, 69, 0.2);
+    border-color: #28a745;
+    color: #d4edda;
+}
+
+.alert-danger {
+    background-color: rgba(220, 53, 69, 0.2);
+    border-color: #dc3545;
+    color: #f8d7da;
+}
+
+/* Navbar customizada */
+.navbar-brand {
+    font-weight: bold;
+    color: #28a745 !important;
+}
+
+/* Footer */
+footer {
+    margin-top: auto;
+}
+
+/* Responsividade para tabelas pequenas */
+@media (max-width: 768px) {
+    .card-body {
+        height: 200px !important;
+    }
+    
+    .btn-sm {
+        font-size: 0.7rem;
+        padding: 0.25rem 0.5rem;
+    }
+}
+
+/* Animações suaves */
+.card, .btn, .modal-content {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
