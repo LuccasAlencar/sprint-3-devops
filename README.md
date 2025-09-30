@@ -5,19 +5,21 @@
 - Raul Clauson | RM 555006
 
 
-# Sistema Mottu - Sprint 3
+# Sistema Mottu - Sprint 3 DevOps
 
-Sistema web completo para gerenciamento de motos desenvolvido com Spring Boot, Thymeleaf, Spring Security e Flyway.
+Sistema web completo para gerenciamento de motos desenvolvido com Spring Boot, Thymeleaf, Spring Security e MySQL, deployado na nuvem Azure usando ACR + ACI.
 
 ## 🚀 Tecnologias Utilizadas
 
 - **Spring Boot 3.5.6** - Framework principal
 - **Thymeleaf** - Template engine para frontend
 - **Spring Security** - Autenticação e autorização
-- **Flyway** - Controle de versão do banco de dados
-- **Oracle Database** - Banco de dados
+- **MySQL 8.0** - Banco de dados na nuvem
 - **Bootstrap 5** - Framework CSS
 - **Maven** - Gerenciamento de dependências
+- **Docker** - Containerização
+- **Azure Container Registry (ACR)** - Armazenamento de imagens
+- **Azure Container Instances (ACI)** - Execução na nuvem
 
 ## 🗄️ Estrutura do Banco de Dados
 
@@ -43,53 +45,76 @@ Sistema web completo para gerenciamento de motos desenvolvido com Spring Boot, T
 | operador | password | OPERADOR | Movimentar motos e alterar status |
 | user | password | USER | Apenas visualização |
 
-## 🚀 Como Executar
+## 🚀 Deploy na Nuvem Azure (ACR + ACI)
 
 ### Pré-requisitos
-- Java 17+
-- Maven 3.6+
-- Oracle Database (ou Docker com Oracle)
+- Azure CLI instalado e configurado
+- Docker instalado
+- Arquivo `.env` configurado com seu RM
 
-### 1. Configuração do Banco de Dados
+### 1. Configuração do Ambiente
 
-Edite o arquivo `src/main/resources/application.properties`:
-
-```properties
-# Configuração do banco Oracle
-spring.datasource.url=jdbc:oracle:thin:@localhost:1521:xe
-spring.datasource.username=SeuUsuario
-spring.datasource.password=SuaSenha
-spring.datasource.driver-class-name=oracle.jdbc.driver.OracleDriver
-
-# Configuração JPA
-spring.jpa.hibernate.ddl-auto=none
-spring.jpa.show-sql=true
-spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.OracleDialect
-
-# Configuração Flyway
-spring.flyway.enabled=true
-spring.flyway.locations=classpath:db/migration
-spring.flyway.baseline-on-migrate=true
-```
-
-### 3. Execução
+Crie um arquivo `.env` na raiz do projeto:
 
 ```bash
-# Clone o repositório
-git clone <url-do-repositorio>
-cd sprint-3-java
+# Identificador (usado para nomear RG/ACR/ACI)
+RM=
 
-# Compile e execute
-mvn clean install
-mvn spring-boot:run
+# MySQL (usado para testes locais)
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=sprint3
+DB_USER=root
+DB_PASSWORD=Admin123!
 ```
 
-### 4. Acesso
+### 2. Deploy Completo
 
-- **URL**: http://localhost:8080
+Execute os comandos na sequência:
+
+```bash
+# 1. Dar permissão de execução aos scripts
+chmod +x *.sh
+
+# 2. Build e push da imagem para o ACR
+./build.sh
+
+# 3. Deploy dos containers no ACI (MySQL + App)
+./deploy.sh
+
+# 4. Testar conexão com o MySQL na nuvem
+docker run --rm -e MYSQL_PWD=Admin123! mysql:8.0 \
+  mysql -h <DB_IP> -u root -e "SELECT 1;"
+
+# 5. Popular o banco com dados iniciais
+docker run --rm -i -e MYSQL_PWD=Admin123! mysql:8.0 \
+  mysql -h <DB_IP> -u root < script_bd.sql
+
+# 6. Verificar se as tabelas foram criadas
+docker run --rm -e MYSQL_PWD=Admin123! mysql:8.0 \
+  mysql -h <DB_IP> -u root -e "USE sprint3; SHOW TABLES;"
+```
+
+**Nota:** Substitua `<DB_IP>` pelo IP do MySQL que será exibido no final do comando `./deploy.sh`.
+
+### 3. Acesso à Aplicação
+
+Após o deploy, acesse a aplicação usando o IP direto (mais confiável):
+
+- **URL**: http://<APP_IP>:8080/login
 - **Login**: admin / password (para acesso completo)
 - **Login**: operador / password (para mudanças de status e zonas)
 - **Login**: user / password (para visualização)
+
+**Nota:** O `<APP_IP>` será exibido no final do comando `./deploy.sh`.
+
+### 4. Limpeza dos Recursos
+
+Para remover todos os recursos criados na Azure:
+
+```bash
+./delete.sh
+```
 
 ## 📁 Estrutura do Projeto
 
@@ -105,7 +130,6 @@ src/
 │   │   ├── service/         # Serviços de negócio
 │   │   └── util/            # Utilitários
 │   └── resources/
-│       ├── db/migration/    # Scripts Flyway
 │       ├── static/          # CSS, JS, imagens
 │       └── templates/       # Templates Thymeleaf
 └── test/                    # Testes unitários
@@ -181,29 +205,24 @@ O sistema vem com dados pré-configurados:
 - 4 zonas (A, B, C, D) com nomes descritivos
 - 4 pátios para diferentes finalidades
 
-## 🐛 Troubleshooting
+## 📋 Arquivos de Deploy
 
-### Problemas Comuns
+- `Dockerfile` - Imagem da aplicação (multi-stage build)
+- `build.sh` - Script para build e push no ACR
+- `deploy.sh` - Script para deploy no ACI
+- `delete.sh` - Script para limpeza dos recursos
+- `script_bd.sql` - DDL e dados iniciais do MySQL
+- `.env` - Configurações de ambiente (criar localmente)
 
-1. **Erro de conexão com Oracle**
-   - Verifique se o Oracle está rodando
-   - Confirme as credenciais no `application.properties`
-   - Teste a conexão: `telnet localhost 1521`
+## 🎯 Requisitos da Sprint Atendidos
 
-2. **Erro de migração Flyway**
-   - Verifique se o usuário tem permissões adequadas
-   - Limpe o schema se necessário: `DROP USER mottu CASCADE;`
+✅ **ACR + ACI**: Azure Container Registry + Azure Container Instances  
+✅ **Banco na Nuvem**: MySQL 8.0 rodando no ACI  
+✅ **Imagem Oficial**: MySQL oficial do Docker Hub  
+✅ **Container não-root**: Dockerfile configurado com usuário appuser  
+✅ **Scripts de Build/Deploy**: build.sh, deploy.sh, delete.sh  
+✅ **DDL Separado**: script_bd.sql com estrutura e dados  
+✅ **CRUD Completo**: Sistema de gerenciamento de motos  
+✅ **2+ Registros**: Dados iniciais pré-carregados  
 
-3. **Página não carrega**
-   - Verifique se a porta 8080 está livre
-   - Confirme se o Maven baixou todas as dependências
-
-### Logs Úteis
-```bash
-# Ativar logs detalhados
-logging.level.com.mottu.sprint3=DEBUG
-logging.level.org.flywaydb=DEBUG
-```
-
-
-**Desenvolvido com muito ☕ para o curso Java Advanced - FIAP**
+**Desenvolvido com muito ☕ para o curso DevOps Tools & Cloud Computing - FIAP**

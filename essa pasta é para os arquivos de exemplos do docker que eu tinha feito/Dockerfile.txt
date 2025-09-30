@@ -1,0 +1,23 @@
+# Stage 1: Build
+FROM maven:3.8.4-openjdk-17-slim AS builder
+WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+
+# Stage 2: Runtime
+FROM openjdk:17-slim
+RUN groupadd -g 1001 appgroup && \
+useradd -r -u 1001 -g appgroup appuser
+WORKDIR /app
+COPY --from=builder /app/target/*.jar app.jar
+ENV DB_HOST=localhost
+ENV DB_PORT=3306
+ENV DB_NAME=importacoesdb
+ENV DB_USER=root
+ENV DB_PASSWORD=password
+RUN chown -R appuser:appgroup /app
+USER appuser
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
