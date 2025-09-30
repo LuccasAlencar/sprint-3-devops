@@ -7,8 +7,7 @@ import jakarta.persistence.*;
 public class Status {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "status_seq")
-    @SequenceGenerator(name = "status_seq", sequenceName = "status_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String nome;

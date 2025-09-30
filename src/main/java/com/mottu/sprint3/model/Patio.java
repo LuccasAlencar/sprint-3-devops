@@ -7,8 +7,7 @@ import jakarta.persistence.*;
 public class Patio {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "patio_seq")
-    @SequenceGenerator(name = "patio_seq", sequenceName = "patio_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String nome;

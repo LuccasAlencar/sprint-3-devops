@@ -8,8 +8,7 @@ import java.sql.Timestamp;
 public class Moto {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "moto_seq")
-    @SequenceGenerator(name = "moto_seq", sequenceName = "moto_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String placa;

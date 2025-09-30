@@ -7,8 +7,7 @@ import jakarta.persistence.*;
 public class Zona {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "zona_seq")
-    @SequenceGenerator(name = "zona_seq", sequenceName = "zona_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String nome;
