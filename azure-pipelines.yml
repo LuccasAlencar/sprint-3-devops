@@ -12,18 +12,14 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  # Configurações da imagem Docker
-  dockerRegistryServiceConnection: 'azure-container-registry'
-  imageRepository: 'sprint4-app'
-  containerRegistry: '$(ACR_NAME).azurecr.io'
-  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
-  tag: '$(Build.BuildId)'
-  
-  # Configurações do Azure
-  azureSubscription: 'azure-service-connection'
+  # Configurações do Azure - AJUSTE AQUI
+  azureSubscription: 'azure-service-connection'  # Nome da sua service connection ARM
   resourceGroup: 'rg-sprint4-rm558253'
   location: 'eastus'
+  acrName: 'acrsprint4rm558253'
   aciName: 'aci-sprint4-rm558253'
+  imageName: 'sprint4-app'
+  tag: '$(Build.BuildId)'
   
   # Configurações do banco de dados
   mysqlServerName: 'mysql-sprint4-rm558253'
@@ -76,26 +72,27 @@ stages:
       - job: DockerJob
         displayName: 'Build Docker Image'
         steps:
-          - task: Docker@2
-            displayName: 'Build Docker Image'
+          - task: AzureCLI@2
+            displayName: 'Build e Push Docker Image'
             inputs:
-              command: 'build'
-              repository: '$(imageRepository)'
-              dockerfile: '$(dockerfilePath)'
-              containerRegistry: '$(dockerRegistryServiceConnection)'
-              tags: |
-                $(tag)
-                latest
-
-          - task: Docker@2
-            displayName: 'Push Docker Image'
-            inputs:
-              command: 'push'
-              repository: '$(imageRepository)'
-              containerRegistry: '$(dockerRegistryServiceConnection)'
-              tags: |
-                $(tag)
-                latest
+              azureSubscription: '$(azureSubscription)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "🐳 Login no Azure Container Registry..."
+                az acr login --name $(acrName)
+                
+                echo "🏗️  Build da imagem Docker..."
+                docker build -t $(acrName).azurecr.io/$(imageName):$(tag) .
+                docker tag $(acrName).azurecr.io/$(imageName):$(tag) $(acrName).azurecr.io/$(imageName):latest
+                
+                echo "📤 Push da imagem para ACR..."
+                docker push $(acrName).azurecr.io/$(imageName):$(tag)
+                docker push $(acrName).azurecr.io/$(imageName):latest
+                
+                echo "✅ Imagem publicada com sucesso!"
+                echo "   - $(acrName).azurecr.io/$(imageName):$(tag)"
+                echo "   - $(acrName).azurecr.io/$(imageName):latest"
 
   # STAGE 3: DEPLOY - Deploy para Azure Container Instance
   - stage: Deploy
@@ -123,28 +120,32 @@ stages:
                       DB_HOST=$(az mysql flexible-server show \
                         --resource-group $(resourceGroup) \
                         --name $(mysqlServerName) \
-                        --query "fullyQualifiedDomainName" -o tsv)
+                        --query "fullyQualifiedDomainName" -o tsv 2>/dev/null || echo "localhost")
                       
-                      DB_PASSWORD=$(az keyvault secret show \
-                        --vault-name kv-sprint4-rm558253 \
-                        --name mysql-password \
-                        --query "value" -o tsv)
+                      # Senha padrão (use Key Vault em produção)
+                      DB_PASSWORD="Sprint4@RM558253Fiap"
                       
                       # Obter credenciais do ACR
                       ACR_USERNAME=$(az acr credential show \
-                        --name $(ACR_NAME) \
+                        --name $(acrName) \
                         --query "username" -o tsv)
                       
                       ACR_PASSWORD=$(az acr credential show \
-                        --name $(ACR_NAME) \
+                        --name $(acrName) \
                         --query "passwords[0].value" -o tsv)
+                      
+                      # Deletar container existente se houver
+                      az container delete \
+                        --resource-group $(resourceGroup) \
+                        --name $(aciName) \
+                        --yes 2>/dev/null || true
                       
                       # Deploy no ACI
                       az container create \
                         --resource-group $(resourceGroup) \
                         --name $(aciName) \
-                        --image $(containerRegistry)/$(imageRepository):$(tag) \
-                        --registry-login-server $(containerRegistry) \
+                        --image $(acrName).azurecr.io/$(imageName):$(tag) \
+                        --registry-login-server $(acrName).azurecr.io \
                         --registry-username $ACR_USERNAME \
                         --registry-password $ACR_PASSWORD \
                         --dns-name-label sprint4-rm558253 \

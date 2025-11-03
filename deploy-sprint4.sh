@@ -1,7 +1,7 @@
 #!/bin/bash
 # Sprint 4 FIAP - RM558253
-# Script de deploy completo no Azure
-# Cria todos os recursos necessários: Resource Group, ACR, MySQL, Key Vault e ACI
+# Script de deploy SIMPLIFICADO (sem Key Vault)
+# Cria todos os recursos necessários: Resource Group, ACR, MySQL e ACI
 
 set -e
 
@@ -13,8 +13,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║  Sprint 4 FIAP - Deploy Azure Container Instance        ║${NC}"
-echo -e "${BLUE}║  RM558253                                                ║${NC}"
+echo -e "${BLUE}║  Sprint 4 FIAP - Deploy Azure (SIMPLIFICADO)            ║${NC}"
+echo -e "${BLUE}║  RM558253 - Sem Key Vault                                ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -26,13 +26,12 @@ ACR_NAME="acrsprint4rm${RM}"
 MYSQL_SERVER="mysql-sprint4-rm${RM}"
 MYSQL_DB="sprint4"
 MYSQL_USER="adminuser"
-KEYVAULT_NAME="kv-sprint4-rm${RM}"
 ACI_NAME="aci-sprint4-rm${RM}"
 IMAGE_NAME="sprint4-app"
 DNS_LABEL="sprint4-rm${RM}"
 
-# Gerar senha segura para MySQL
-MYSQL_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+# Gerar senha MySQL (fixa para facilitar)
+MYSQL_PASSWORD="Sprint4@RM${RM}Fiap"
 
 echo -e "${YELLOW}📋 Configurações:${NC}"
 echo "  Resource Group: $RESOURCE_GROUP"
@@ -55,7 +54,7 @@ echo -e "${GREEN}✅ Logado na subscription: $SUBSCRIPTION_ID${NC}"
 echo ""
 
 # 1. Criar Resource Group
-echo -e "${BLUE}📦 [1/7] Criando Resource Group...${NC}"
+echo -e "${BLUE}📦 [1/6] Criando Resource Group...${NC}"
 if az group show --name $RESOURCE_GROUP &> /dev/null; then
     echo -e "${YELLOW}⚠️  Resource Group já existe${NC}"
 else
@@ -65,7 +64,7 @@ fi
 echo ""
 
 # 2. Criar Azure Container Registry
-echo -e "${BLUE}🐳 [2/7] Criando Azure Container Registry...${NC}"
+echo -e "${BLUE}🐳 [2/6] Criando Azure Container Registry...${NC}"
 if az acr show --name $ACR_NAME --resource-group $RESOURCE_GROUP &> /dev/null; then
     echo -e "${YELLOW}⚠️  ACR já existe${NC}"
 else
@@ -78,30 +77,8 @@ else
 fi
 echo ""
 
-# 3. Criar Key Vault
-echo -e "${BLUE}🔑 [3/7] Criando Key Vault...${NC}"
-if az keyvault show --name $KEYVAULT_NAME --resource-group $RESOURCE_GROUP &> /dev/null; then
-    echo -e "${YELLOW}⚠️  Key Vault já existe${NC}"
-else
-    az keyvault create \
-        --name $KEYVAULT_NAME \
-        --resource-group $RESOURCE_GROUP \
-        --location $LOCATION \
-        --enable-rbac-authorization false
-    echo -e "${GREEN}✅ Key Vault criado${NC}"
-fi
-
-# Salvar senha do MySQL no Key Vault
-echo -e "${BLUE}🔐 Salvando credenciais no Key Vault...${NC}"
-az keyvault secret set \
-    --vault-name $KEYVAULT_NAME \
-    --name mysql-password \
-    --value "$MYSQL_PASSWORD" > /dev/null
-echo -e "${GREEN}✅ Credenciais salvas${NC}"
-echo ""
-
-# 4. Criar MySQL Flexible Server
-echo -e "${BLUE}🗄️  [4/7] Criando MySQL Flexible Server...${NC}"
+# 3. Criar MySQL Flexible Server
+echo -e "${BLUE}🗄️  [3/6] Criando MySQL Flexible Server...${NC}"
 if az mysql flexible-server show --name $MYSQL_SERVER --resource-group $RESOURCE_GROUP &> /dev/null; then
     echo -e "${YELLOW}⚠️  MySQL Server já existe${NC}"
 else
@@ -129,8 +106,8 @@ az mysql flexible-server db create \
 echo -e "${GREEN}✅ Database criado${NC}"
 echo ""
 
-# 5. Build e Push da imagem Docker
-echo -e "${BLUE}🏗️  [5/7] Build da imagem Docker...${NC}"
+# 4. Build e Push da imagem Docker
+echo -e "${BLUE}🏗️  [4/6] Build da imagem Docker...${NC}"
 ACR_LOGIN_SERVER="${ACR_NAME}.azurecr.io"
 
 # Login no ACR
@@ -146,8 +123,8 @@ docker push $ACR_LOGIN_SERVER/$IMAGE_NAME:latest
 echo -e "${GREEN}✅ Imagem enviada para ACR${NC}"
 echo ""
 
-# 6. Executar script SQL no MySQL
-echo -e "${BLUE}💾 [6/7] Executando script SQL...${NC}"
+# 5. Executar script SQL no MySQL
+echo -e "${BLUE}💾 [5/6] Executando script SQL...${NC}"
 MYSQL_HOST=$(az mysql flexible-server show \
     --resource-group $RESOURCE_GROUP \
     --name $MYSQL_SERVER \
@@ -156,14 +133,15 @@ MYSQL_HOST=$(az mysql flexible-server show \
 echo "Aguardando MySQL estar pronto..."
 sleep 30
 
-mysql -h $MYSQL_HOST -u $MYSQL_USER -p"$MYSQL_PASSWORD" < script_bd.sql || {
-    echo -e "${YELLOW}⚠️  Erro ao executar script SQL. Você pode executar manualmente depois.${NC}"
+mysql -h $MYSQL_HOST -u $MYSQL_USER -p"$MYSQL_PASSWORD" < script_bd.sql 2>/dev/null || {
+    echo -e "${YELLOW}⚠️  Erro ao executar script SQL. Você pode executar manualmente depois:${NC}"
+    echo "   mysql -h $MYSQL_HOST -u $MYSQL_USER -p'$MYSQL_PASSWORD' < script_bd.sql"
 }
 echo -e "${GREEN}✅ Script SQL executado${NC}"
 echo ""
 
-# 7. Deploy no Azure Container Instance
-echo -e "${BLUE}🚀 [7/7] Deploy no Azure Container Instance...${NC}"
+# 6. Deploy no Azure Container Instance
+echo -e "${BLUE}🚀 [6/6] Deploy no Azure Container Instance...${NC}"
 
 # Obter credenciais do ACR
 ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query "username" -o tsv)
@@ -173,7 +151,7 @@ ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query "passwords[0].val
 az container delete \
     --resource-group $RESOURCE_GROUP \
     --name $ACI_NAME \
-    --yes || true
+    --yes 2>/dev/null || true
 
 # Criar container
 az container create \
@@ -231,5 +209,11 @@ echo -e "${BLUE}💡 COMANDOS ÚTEIS:${NC}"
 echo "   Ver logs: az container logs -g $RESOURCE_GROUP -n $ACI_NAME"
 echo "   Ver status: az container show -g $RESOURCE_GROUP -n $ACI_NAME"
 echo "   Deletar tudo: ./delete-sprint4.sh"
+echo ""
+echo -e "${YELLOW}💾 Credenciais salvas em: .mysql-credentials${NC}"
+echo "DB_HOST=$MYSQL_HOST" > .mysql-credentials
+echo "DB_USER=$MYSQL_USER" >> .mysql-credentials
+echo "DB_PASSWORD=$MYSQL_PASSWORD" >> .mysql-credentials
+echo "DB_NAME=$MYSQL_DB" >> .mysql-credentials
 echo ""
 echo -e "${GREEN}✨ Deploy finalizado! Acesse a aplicação pela URL acima.${NC}"
