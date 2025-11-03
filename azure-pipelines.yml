@@ -1,0 +1,337 @@
+# Pipeline CI/CD para Sprint 4 - Azure DevOps
+# CI: Build + Testes Automáticos
+# CD: Deploy Automático para Azure Container Instance (ACI)
+
+trigger:
+  branches:
+    include:
+      - master
+  paths:
+    exclude:
+      - README.md
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  # Variáveis do projeto (não sensíveis)
+  - group: 'Sprint4-Config'
+  - name: mavenVersion
+    value: '3.9.6'
+  - name: javaVersion
+    value: '17'
+  - name: dockerRegistryServiceConnection
+    value: 'ACR-ServiceConnection'
+  - name: azureSubscription
+    value: 'Azure-ServiceConnection'
+  - name: imageRepository
+    value: 'sprint3-app'
+  - name: dockerfilePath
+    value: '$(Build.SourcesDirectory)/Dockerfile'
+  - name: containerRegistry
+    value: '$(ACR_NAME).azurecr.io'
+  - name: tag
+    value: '$(Build.BuildId)'
+
+stages:
+  # ==========================================
+  # STAGE 1: CI - Continuous Integration
+  # ==========================================
+  - stage: Build
+    displayName: 'CI - Build e Testes'
+    jobs:
+      - job: BuildAndTest
+        displayName: 'Build e Execução de Testes'
+        steps:
+          # Checkout do código
+          - checkout: self
+            displayName: 'Checkout do Código'
+
+          # Configuração do Java
+          - task: JavaToolInstaller@0
+            displayName: 'Instalar Java $(javaVersion)'
+            inputs:
+              versionSpec: '$(javaVersion)'
+              jdkArchitecture: 'x64'
+              jdkSource: 'PreInstalled'
+
+          # Configuração do Maven
+          - task: Maven@3
+            displayName: 'Configurar Maven'
+            inputs:
+              mavenVersionOption: 'Path'
+              mavenPath: '/usr/share/maven'
+              options: '-Xmx3072m $(MAVEN_OPTS)'
+
+          # Build da aplicação
+          - task: Maven@3
+            displayName: 'Maven Build'
+            inputs:
+              mavenPomFile: 'pom.xml'
+              goals: 'clean compile'
+              options: '$(MAVEN_OPTS)'
+              publishJUnitResults: false
+
+          # Execução de Testes Automáticos
+          - task: Maven@3
+            displayName: 'Executar Testes Unitários'
+            inputs:
+              mavenPomFile: 'pom.xml'
+              goals: 'test'
+              options: '$(MAVEN_OPTS)'
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              testRunTitle: 'Testes Unitários - Sprint 4'
+
+          # Publicação de Resultados de Testes
+          - task: PublishTestResults@2
+            displayName: 'Publicar Resultados de Testes'
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: '**/TEST-*.xml'
+              testRunTitle: 'Testes - Build $(Build.BuildId)'
+            condition: always()
+
+          # Build do JAR
+          - task: Maven@3
+            displayName: 'Package JAR'
+            inputs:
+              mavenPomFile: 'pom.xml'
+              goals: 'package'
+              options: '$(MAVEN_OPTS) -DskipTests'
+              publishJUnitResults: false
+
+          # Build da Imagem Docker
+          - task: Docker@2
+            displayName: 'Build Docker Image'
+            inputs:
+              containerRegistry: '$(dockerRegistryServiceConnection)'
+              repository: '$(imageRepository)'
+              command: 'build'
+              Dockerfile: '$(dockerfilePath)'
+              tags: |
+                $(tag)
+                latest
+
+          # Push da Imagem para ACR
+          - task: Docker@2
+            displayName: 'Push Docker Image para ACR'
+            inputs:
+              containerRegistry: '$(dockerRegistryServiceConnection)'
+              repository: '$(imageRepository)'
+              command: 'push'
+              tags: |
+                $(tag)
+                latest
+
+          # Geração e Publicação de Artefatos
+          - task: CopyFiles@2
+            displayName: 'Copiar Artefatos'
+            inputs:
+              SourceFolder: '$(Build.SourcesDirectory)'
+              Contents: |
+                target/*.jar
+                Dockerfile
+                script_bd.sql
+              TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publicar Artefatos'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'drop'
+              publishLocation: 'Container'
+
+  # ==========================================
+  # STAGE 2: CD - Continuous Deployment
+  # ==========================================
+  - stage: Deploy
+    displayName: 'CD - Deploy para ACI'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - deployment: DeployToACI
+        displayName: 'Deploy para Azure Container Instance'
+        environment: 'ACI-Production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # Configuração do Azure CLI
+                - task: AzureCLI@2
+                  displayName: 'Configurar Azure CLI'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      echo "Azure CLI configurado"
+                      az --version
+
+                # Verificar se o MySQL Container já existe, se não criar
+                - task: AzureCLI@2
+                  displayName: 'Criar/Verificar Container MySQL (ACI)'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      RESOURCE_GROUP="$(RESOURCE_GROUP)"
+                      ACI_DB_NAME="$(ACI_DB_NAME)"
+                      ACR_NAME="$(ACR_NAME)"
+                      
+                      # Obter credenciais do ACR
+                      ACR_USERNAME=$(az acr credential show --name "$ACR_NAME" --query username -o tsv)
+                      ACR_PASSWORD=$(az acr credential show --name "$ACR_NAME" --query passwords[0].value -o tsv)
+                      
+                      # Verificar se o container já existe
+                      DB_EXISTS=$(az container show --resource-group "$RESOURCE_GROUP" --name "$ACI_DB_NAME" --query name -o tsv 2>/dev/null || echo "")
+                      
+                      if [ -z "$DB_EXISTS" ]; then
+                        echo "Criando container MySQL..."
+                        az container create \
+                          --resource-group "$RESOURCE_GROUP" \
+                          --name "$ACI_DB_NAME" \
+                          --image $ACR_NAME.azurecr.io/mysql:8.0 \
+                          --os-type Linux \
+                          --cpu 1 \
+                          --memory 2 \
+                          --ports 3306 \
+                          --ip-address Public \
+                          --environment-variables \
+                            MYSQL_ROOT_PASSWORD="$(DB_PASSWORD)" \
+                            MYSQL_DATABASE="$(DB_NAME)" \
+                          --registry-login-server $ACR_NAME.azurecr.io \
+                          --registry-username "$ACR_USERNAME" \
+                          --registry-password "$ACR_PASSWORD" \
+                          --output none
+                      else
+                        echo "Container MySQL já existe: $ACI_DB_NAME"
+                      fi
+                      
+                      # Aguardar IP do MySQL
+                      echo "Aguardando IP do MySQL..."
+                      for i in {1..40}; do
+                        DB_IP=$(az container show --resource-group "$RESOURCE_GROUP" --name "$ACI_DB_NAME" --query ipAddress.ip -o tsv 2>/dev/null || echo "")
+                        if [[ -n "$DB_IP" && "$DB_IP" != "null" && "$DB_IP" != "" ]]; then
+                          echo "DB IP obtido: $DB_IP"
+                          break
+                        fi
+                        echo "Tentativa $i: aguardando IP..."
+                        sleep 5
+                      done
+                      
+                      if [[ -z "$DB_IP" || "$DB_IP" == "null" ]]; then
+                        echo "##vso[task.logissue type=error]Não foi possível obter IP do banco."
+                        exit 1
+                      fi
+                      
+                      echo "##vso[task.setvariable variable=DB_HOST;isOutput=false]$DB_IP"
+
+                # Deploy da Aplicação no ACI
+                - task: AzureCLI@2
+                  displayName: 'Deploy Aplicação no ACI'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      RESOURCE_GROUP="$(RESOURCE_GROUP)"
+                      ACI_APP_NAME="$(ACI_APP_NAME)"
+                      ACR_NAME="$(ACR_NAME)"
+                      IMAGE_NAME="$(imageRepository)"
+                      TAG="$(tag)"
+                      DNS_NAME_LABEL="$(DNS_NAME_LABEL)"
+                      
+                      # Obter credenciais do ACR
+                      ACR_USERNAME=$(az acr credential show --name "$ACR_NAME" --query username -o tsv)
+                      ACR_PASSWORD=$(az acr credential show --name "$ACR_NAME" --query passwords[0].value -o tsv)
+                      
+                      # Obter IP do MySQL (usando variável do step anterior)
+                      DB_IP=$(az container show --resource-group "$RESOURCE_GROUP" --name "$ACI_DB_NAME" --query ipAddress.ip -o tsv)
+                      
+                      echo "Deploy da aplicação no ACI..."
+                      echo "Resource Group: $RESOURCE_GROUP"
+                      echo "Container Name: $ACI_APP_NAME"
+                      echo "Image: $ACR_NAME.azurecr.io/$IMAGE_NAME:$TAG"
+                      echo "DB Host: $DB_IP"
+                      
+                      # Deletar container existente se houver (para atualizar)
+                      EXISTING=$(az container show --resource-group "$RESOURCE_GROUP" --name "$ACI_APP_NAME" --query name -o tsv 2>/dev/null || echo "")
+                      if [ -n "$EXISTING" ]; then
+                        echo "Removendo container existente..."
+                        az container delete --resource-group "$RESOURCE_GROUP" --name "$ACI_APP_NAME" --yes --output none
+                        echo "Aguardando remoção completa..."
+                        sleep 10
+                      fi
+                      
+                      # Criar novo container
+                      az container create \
+                        --resource-group "$RESOURCE_GROUP" \
+                        --name "$ACI_APP_NAME" \
+                        --image $ACR_NAME.azurecr.io/$IMAGE_NAME:$TAG \
+                        --os-type Linux \
+                        --cpu 1 \
+                        --memory 1.5 \
+                        --ports 8080 \
+                        --dns-name-label "$DNS_NAME_LABEL" \
+                        --environment-variables \
+                          DB_HOST="$DB_IP" \
+                          DB_PORT=3306 \
+                          DB_NAME="$(DB_NAME)" \
+                          DB_USER="$(DB_USER)" \
+                          DB_PASSWORD="$(DB_PASSWORD)" \
+                        --registry-login-server $ACR_NAME.azurecr.io \
+                        --registry-username "$ACR_USERNAME" \
+                        --registry-password "$ACR_PASSWORD" \
+                        --output none
+                      
+                      # Obter informações de acesso
+                      APP_FQDN=$(az container show --resource-group "$RESOURCE_GROUP" --name "$ACI_APP_NAME" --query ipAddress.fqdn -o tsv)
+                      APP_IP=$(az container show --resource-group "$RESOURCE_GROUP" --name "$ACI_APP_NAME" --query ipAddress.ip -o tsv)
+                      
+                      echo "##vso[task.setvariable variable=APP_FQDN;isOutput=false]$APP_FQDN"
+                      echo "##vso[task.setvariable variable=APP_IP;isOutput=false]$APP_IP"
+                      
+                      echo ""
+                      echo "=========================================="
+                      echo "✅ Deploy concluído com sucesso!"
+                      echo "=========================================="
+                      echo "URL: http://${APP_FQDN}:8080"
+                      echo "IP: ${APP_IP}"
+                      echo "=========================================="
+
+                # Popular banco de dados (opcional - pode ser executado manualmente)
+                - task: AzureCLI@2
+                  displayName: 'Popular Banco de Dados (opcional)'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      RESOURCE_GROUP="$(RESOURCE_GROUP)"
+                      ACI_DB_NAME="$(ACI_DB_NAME)"
+                      DB_IP=$(az container show --resource-group "$RESOURCE_GROUP" --name "$ACI_DB_NAME" --query ipAddress.ip -o tsv)
+                      
+                      echo "Banco de dados disponível em: $DB_IP"
+                      echo "Nota: Para popular o banco, execute o script populate-db.sh manualmente após o deploy"
+
+                # Publicar informações de deploy
+                - task: Bash@3
+                  displayName: 'Publicar Informações de Deploy'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      echo "##vso[task.complete result=Succeeded]"
+                      echo ""
+                      echo "=========================================="
+                      echo "✅ Pipeline CI/CD Concluído!"
+                      echo "=========================================="
+                      echo ""
+                      echo "Aplicação disponível em:"
+                      echo "  URL: http://$(APP_FQDN):8080"
+                      echo "  IP: $(APP_IP)"
+                      echo ""
+                      echo "Acesse a aplicação e realize operações CRUD completas."
+                      echo "=========================================="
+
