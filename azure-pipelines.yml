@@ -1,0 +1,184 @@
+# Sprint 4 FIAP - RM558253
+# Pipeline CI/CD para Azure DevOps
+# Deploy em Azure Container Instance (ACI)
+
+trigger:
+  branches:
+    include:
+      - main
+      - master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  # Configurações da imagem Docker
+  dockerRegistryServiceConnection: 'azure-container-registry'
+  imageRepository: 'sprint4-app'
+  containerRegistry: '$(ACR_NAME).azurecr.io'
+  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
+  tag: '$(Build.BuildId)'
+  
+  # Configurações do Azure
+  azureSubscription: 'azure-service-connection'
+  resourceGroup: 'rg-sprint4-rm558253'
+  location: 'eastus'
+  aciName: 'aci-sprint4-rm558253'
+  
+  # Configurações do banco de dados
+  mysqlServerName: 'mysql-sprint4-rm558253'
+  mysqlDatabase: 'sprint4'
+
+stages:
+  # STAGE 1: BUILD - Compilação e Testes
+  - stage: Build
+    displayName: 'Build e Testes'
+    jobs:
+      - job: BuildJob
+        displayName: 'Build Java Application'
+        steps:
+          - task: Maven@3
+            displayName: 'Maven Build e Testes'
+            inputs:
+              mavenPomFile: 'pom.xml'
+              goals: 'clean package'
+              options: '-DskipTests=false'
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: '1.17'
+              mavenVersionOption: 'Default'
+              mavenOptions: '-Xmx3072m'
+              mavenAuthenticateFeed: false
+              effectivePomSkip: false
+              sonarQubeRunAnalysis: false
+
+          - task: CopyFiles@2
+            displayName: 'Copiar Artefatos'
+            inputs:
+              SourceFolder: '$(Build.SourcesDirectory)/target'
+              Contents: '*.jar'
+              TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publicar Artefatos'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'drop'
+              publishLocation: 'Container'
+
+  # STAGE 2: IMAGE - Build e Push da Imagem Docker
+  - stage: Image
+    displayName: 'Build e Push Docker Image'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: DockerJob
+        displayName: 'Build Docker Image'
+        steps:
+          - task: Docker@2
+            displayName: 'Build Docker Image'
+            inputs:
+              command: 'build'
+              repository: '$(imageRepository)'
+              dockerfile: '$(dockerfilePath)'
+              containerRegistry: '$(dockerRegistryServiceConnection)'
+              tags: |
+                $(tag)
+                latest
+
+          - task: Docker@2
+            displayName: 'Push Docker Image'
+            inputs:
+              command: 'push'
+              repository: '$(imageRepository)'
+              containerRegistry: '$(dockerRegistryServiceConnection)'
+              tags: |
+                $(tag)
+                latest
+
+  # STAGE 3: DEPLOY - Deploy para Azure Container Instance
+  - stage: Deploy
+    displayName: 'Deploy to Azure ACI'
+    dependsOn: Image
+    condition: succeeded()
+    jobs:
+      - deployment: DeployACI
+        displayName: 'Deploy to Container Instance'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  displayName: 'Deploy to ACI'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      echo "🚀 Iniciando deploy no Azure Container Instance..."
+                      
+                      # Obter credenciais do banco
+                      DB_HOST=$(az mysql flexible-server show \
+                        --resource-group $(resourceGroup) \
+                        --name $(mysqlServerName) \
+                        --query "fullyQualifiedDomainName" -o tsv)
+                      
+                      DB_PASSWORD=$(az keyvault secret show \
+                        --vault-name kv-sprint4-rm558253 \
+                        --name mysql-password \
+                        --query "value" -o tsv)
+                      
+                      # Obter credenciais do ACR
+                      ACR_USERNAME=$(az acr credential show \
+                        --name $(ACR_NAME) \
+                        --query "username" -o tsv)
+                      
+                      ACR_PASSWORD=$(az acr credential show \
+                        --name $(ACR_NAME) \
+                        --query "passwords[0].value" -o tsv)
+                      
+                      # Deploy no ACI
+                      az container create \
+                        --resource-group $(resourceGroup) \
+                        --name $(aciName) \
+                        --image $(containerRegistry)/$(imageRepository):$(tag) \
+                        --registry-login-server $(containerRegistry) \
+                        --registry-username $ACR_USERNAME \
+                        --registry-password $ACR_PASSWORD \
+                        --dns-name-label sprint4-rm558253 \
+                        --ports 8080 \
+                        --cpu 1 \
+                        --memory 2 \
+                        --environment-variables \
+                          DB_HOST=$DB_HOST \
+                          DB_PORT=3306 \
+                          DB_NAME=$(mysqlDatabase) \
+                          DB_USER=adminuser \
+                          DB_PASSWORD=$DB_PASSWORD \
+                        --restart-policy Always \
+                        --location $(location)
+                      
+                      echo "✅ Deploy concluído!"
+                      echo "🌐 URL: http://sprint4-rm558253.$(location).azurecontainer.io:8080"
+
+                - task: AzureCLI@2
+                  displayName: 'Verificar Status do Deploy'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      echo "🔍 Verificando status do container..."
+                      az container show \
+                        --resource-group $(resourceGroup) \
+                        --name $(aciName) \
+                        --query "{Status:instanceView.state, FQDN:ipAddress.fqdn, IP:ipAddress.ip}" \
+                        -o table
+                      
+                      echo "📋 Logs do container:"
+                      az container logs \
+                        --resource-group $(resourceGroup) \
+                        --name $(aciName) \
+                        --tail 50

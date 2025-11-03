@@ -1,13 +1,8 @@
-# Grupo
+# Sprint 4 FIAP - DevOps Tools & Cloud Computing
 
-- Daniel da Silva Barros | RM 556152
-- Luccas de Alencar Rufino | RM 558253
-- Raul Clauson | RM 555006
+**RM558253 - Luccas de Alencar Rufino**
 
-
-# Sistema Mottu - Sprint 3 DevOps
-
-Sistema web completo para gerenciamento de motos desenvolvido com Spring Boot, Thymeleaf, Spring Security e MySQL, deployado na nuvem Azure usando ACR + ACI.
+Sistema de gerenciamento de motos desenvolvido com **Spring Boot**, **MySQL** na nuvem e **Azure DevOps** com pipeline CI/CD completo, deployado em **Azure Container Instance (ACI)**.
 
 ## 🚀 Tecnologias Utilizadas
 
@@ -18,8 +13,11 @@ Sistema web completo para gerenciamento de motos desenvolvido com Spring Boot, T
 - **Bootstrap 5** - Framework CSS
 - **Maven** - Gerenciamento de dependências
 - **Docker** - Containerização
-- **Azure Container Registry (ACR)** - Armazenamento de imagens
-- **Azure Container Instances (ACI)** - Execução na nuvem
+- **Azure Container Registry (ACR)** - Armazenamento de imagens Docker
+- **Azure Container Instances (ACI)** - Hospedagem da aplicação
+- **Azure MySQL Flexible Server** - Banco de dados gerenciado
+- **Azure Key Vault** - Armazenamento seguro de credenciais
+- **Azure DevOps** - Pipeline CI/CD com YAML
 
 ## 🗄️ Estrutura do Banco de Dados
 
@@ -45,76 +43,155 @@ Sistema web completo para gerenciamento de motos desenvolvido com Spring Boot, T
 | operador | password | OPERADOR | Movimentar motos e alterar status |
 | user | password | USER | Apenas visualização |
 
-## 🚀 Deploy na Nuvem Azure (ACR + ACI)
+## 📋 Arquitetura da Solução
+
+### Componentes
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      Azure DevOps                             │
+│  ┌────────────┐   ┌────────────┐   ┌─────────────────┐      │
+│  │   BUILD    │ → │   IMAGE    │ → │     DEPLOY      │      │
+│  │  + Tests   │   │ Docker ACR │   │   Azure ACI     │      │
+│  └────────────┘   └────────────┘   └─────────────────┘      │
+└──────────────────────────────────────────────────────────────┘
+                              ↓
+┌──────────────────────────────────────────────────────────────┐
+│                      Azure Cloud                              │
+│  ┌────────────────┐  ┌──────────────────┐  ┌──────────────┐ │
+│  │ Container Reg  │  │ Container Inst.  │  │  MySQL PaaS  │ │
+│  │     (ACR)      │  │     (ACI)        │  │   Flexible   │ │
+│  │                │  │  - App:8080      │  │   Server     │ │
+│  └────────────────┘  └──────────────────┘  └──────────────┘ │
+│  ┌────────────────┐                                          │
+│  │  Key Vault     │ ← Credenciais seguras                    │
+│  └────────────────┘                                          │
+└──────────────────────────────────────────────────────────────┘
+```
+
+## 🚀 Opção 1: Deploy via Script Automatizado (Recomendado)
 
 ### Pré-requisitos
-- Azure CLI instalado e configurado
-- Docker instalado
-- Arquivo `.env` configurado com seu RM
+- **Azure CLI** instalado ([Download](https://docs.microsoft.com/cli/azure/install-azure-cli))
+- **Docker** instalado ([Download](https://www.docker.com/products/docker-desktop))
+- **Git Bash** (no Windows) ou terminal bash
+- Conta Azure ativa
 
-### 1. Configuração do Ambiente
+### Passo a Passo
 
-Crie um arquivo `.env` na raiz do projeto:
-
+#### 1. Login no Azure
 ```bash
-# Identificador (usado para nomear RG/ACR/ACI)
-RM=
-
-# MySQL (usado para testes locais)
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_NAME=sprint3
-DB_USER=root
-DB_PASSWORD=Admin123!
+az login
 ```
 
-### 2. Deploy Completo
-
-Execute os comandos na sequência:
-
+#### 2. Deploy Completo (1 comando)
 ```bash
-# 1. Dar permissão de execução aos scripts
-chmod +x *.sh
+# Dar permissão de execução
+chmod +x deploy-sprint4.sh delete-sprint4.sh
 
-# 2. Build e push da imagem para o ACR
-./build.sh
-
-# 3. Deploy dos containers no ACI (MySQL + App)
-./deploy.sh
-
-# 4. Testar conexão com o MySQL na nuvem
-docker run --rm -e MYSQL_PWD=Admin123! mysql:8.0 \
-  mysql -h <DB_IP> -u root -e "SELECT 1;"
-
-# 5. Popular o banco com dados iniciais
-docker run --rm -i -e MYSQL_PWD=Admin123! mysql:8.0 \
-  mysql -h <DB_IP> -u root < script_bd.sql
-
-# 6. Verificar se as tabelas foram criadas
-docker run --rm -e MYSQL_PWD=Admin123! mysql:8.0 \
-  mysql -h <DB_IP> -u root -e "USE sprint3; SHOW TABLES;"
+# Executar deploy (cria TUDO automaticamente)
+./deploy-sprint4.sh
 ```
 
-**Nota:** Substitua `<DB_IP>` pelo IP do MySQL que será exibido no final do comando `./deploy.sh`.
+**O script cria automaticamente:**
+- ✅ Resource Group
+- ✅ Azure Container Registry (ACR)
+- ✅ MySQL Flexible Server na nuvem
+- ✅ Key Vault com credenciais
+- ✅ Build e push da imagem Docker
+- ✅ Execução do script SQL
+- ✅ Azure Container Instance (ACI)
 
-### 3. Acesso à Aplicação
+#### 3. Acesso à Aplicação
 
-Após o deploy, acesse a aplicação usando o IP direto (mais confiável):
+Após o deploy (5-10 minutos), você verá:
 
-- **URL**: http://<APP_IP>:8080/login
-- **Login**: admin / password (para acesso completo)
-- **Login**: operador / password (para mudanças de status e zonas)
-- **Login**: user / password (para visualização)
-
-**Nota:** O `<APP_IP>` será exibido no final do comando `./deploy.sh`.
-
-### 4. Limpeza dos Recursos
-
-Para remover todos os recursos criados na Azure:
-
-```bash
-./delete.sh
 ```
+🌐 URL da Aplicação: http://sprint4-rm558253.eastus.azurecontainer.io:8080
+```
+
+Acesse com:
+- **admin** / **password** (acesso completo)
+- **operador** / **password** (operações)
+- **user** / **password** (visualização)
+
+#### 4. Limpeza dos Recursos
+
+Para deletar TUDO:
+```bash
+./delete-sprint4.sh
+```
+
+## 🔄 Opção 2: Deploy via Azure DevOps Pipeline
+
+### 1. Configurar Azure DevOps
+
+#### A) Criar Projeto
+1. Acesse [dev.azure.com](https://dev.azure.com)
+2. Crie novo projeto: **Sprint 4 - Azure DevOps**
+3. Visibilidade: **Private**
+4. Version control: **Git**
+5. Work item process: **Scrum**
+
+#### B) Configurar Service Connections
+
+**Azure Resource Manager:**
+1. Project Settings → Service connections
+2. New service connection → Azure Resource Manager
+3. Service principal (automatic)
+4. Subscription: Selecione sua subscription
+5. Resource Group: `rg-sprint4-rm558253`
+6. Service connection name: `azure-service-connection`
+7. Grant access permission to all pipelines: ✅
+
+**Azure Container Registry:**
+1. New service connection → Docker Registry
+2. Registry type: Azure Container Registry
+3. Subscription: Selecione sua subscription
+4. Azure container registry: Selecione o ACR criado
+5. Service connection name: `azure-container-registry`
+6. Grant access permission to all pipelines: ✅
+
+#### C) Configurar Variáveis do Pipeline
+
+No arquivo `azure-pipelines.yml`, ajuste:
+```yaml
+variables:
+  ACR_NAME: 'acrsprint4rm558253'  # Seu ACR
+  resourceGroup: 'rg-sprint4-rm558253'
+  mysqlServerName: 'mysql-sprint4-rm558253'
+```
+
+#### D) Criar Pipeline
+
+1. Pipelines → New pipeline
+2. Selecione: **Azure Repos Git** (ou GitHub se preferir)
+3. Selecione o repositório
+4. Configure your pipeline: **Existing Azure Pipelines YAML file**
+5. Path: `/azure-pipelines.yml`
+6. Run
+
+### 2. Trigger do Pipeline
+
+O pipeline executa automaticamente em:
+- Push na branch `main` ou `master`
+- Pull request para `main` ou `master`
+
+### 3. Stages do Pipeline
+
+#### Stage 1: Build
+- Compila código Java com Maven
+- Executa testes unitários
+- Publica artefatos
+
+#### Stage 2: Image
+- Build da imagem Docker
+- Push para Azure Container Registry
+- Tag com BuildId + latest
+
+#### Stage 3: Deploy
+- Deploy no Azure Container Instance
+- Configuração de variáveis de ambiente
+- Verificação de status e logs
 
 ## 📁 Estrutura do Projeto
 
@@ -205,24 +282,124 @@ O sistema vem com dados pré-configurados:
 - 4 zonas (A, B, C, D) com nomes descritivos
 - 4 pátios para diferentes finalidades
 
-## 📋 Arquivos de Deploy
+## 📋 Arquivos do Projeto
 
-- `Dockerfile` - Imagem da aplicação (multi-stage build)
-- `build.sh` - Script para build e push no ACR
-- `deploy.sh` - Script para deploy no ACI
-- `delete.sh` - Script para limpeza dos recursos
-- `script_bd.sql` - DDL e dados iniciais do MySQL
-- `.env` - Configurações de ambiente (criar localmente)
+### Scripts de Deploy
+- `deploy-sprint4.sh` - Deploy automatizado completo (cria todos recursos Azure)
+- `delete-sprint4.sh` - Remove todos os recursos criados
 
-## 🎯 Requisitos da Sprint Atendidos
+### Configuração Azure DevOps
+- `azure-pipelines.yml` - Pipeline CI/CD com 3 stages (Build, Image, Deploy)
 
-✅ **ACR + ACI**: Azure Container Registry + Azure Container Instances  
-✅ **Banco na Nuvem**: MySQL 8.0 rodando no ACI  
-✅ **Imagem Oficial**: MySQL oficial do Docker Hub  
-✅ **Container não-root**: Dockerfile configurado com usuário appuser  
-✅ **Scripts de Build/Deploy**: build.sh, deploy.sh, delete.sh  
-✅ **DDL Separado**: script_bd.sql com estrutura e dados  
-✅ **CRUD Completo**: Sistema de gerenciamento de motos  
-✅ **2+ Registros**: Dados iniciais pré-carregados  
+### Docker
+- `Dockerfile` - Build multi-stage da aplicação Java
 
-**Desenvolvido com muito ☕ para o curso DevOps Tools & Cloud Computing - FIAP**
+### Banco de Dados
+- `script_bd.sql` - DDL completo + dados iniciais
+
+### Código Fonte
+- `pom.xml` - Dependências Maven
+- `src/` - Código fonte Java Spring Boot
+
+## 🎯 Requisitos Sprint 4 Atendidos
+
+### Obrigatórios (Todos ✅)
+
+✅ **1. Descrição da solução** - Stack tecnológica documentada  
+✅ **2. Diagrama de Arquitetura + Fluxo CI/CD** - Diagrama ASCII incluído  
+✅ **3. Detalhamento dos componentes** - README completo  
+✅ **4. Banco de Dados válido** - MySQL Flexible Server na nuvem  
+✅ **5. Configuração do projeto no Azure DevOps** - Projeto privado, Git, Scrum  
+✅ **6. Convite ao professor** - Acesso pode ser concedido no portal Azure DevOps  
+✅ **7. Pipelines CI/CD funcionando** (30 pontos):
+  - ✅ CI: Build + Testes automáticos com Maven
+  - ✅ CD: Deploy automático após build
+  - ✅ Branch master/main configurada
+  - ✅ Artefatos publicados no Azure DevOps
+  - ✅ Imagem Docker no ACR
+  - ✅ Deploy em Azure Container Instance
+
+### Pipeline CI/CD - 3 Stages
+
+**Stage 1: BUILD** (CI)
+- Maven build com compilação
+- Testes unitários automáticos
+- Publicação de artefatos
+
+**Stage 2: IMAGE**
+- Build da imagem Docker
+- Push para Azure Container Registry
+- Versionamento com BuildId + latest
+
+**Stage 3: DEPLOY** (CD)
+- Deploy no Azure Container Instance
+- Configuração de variáveis de ambiente
+- Conexão segura com MySQL
+- Verificação de status e logs
+
+### Tecnologia e Segurança
+
+✅ **Docker multi-stage**: Build otimizado  
+✅ **Container não-root**: Usuário `appuser` (UID 10001)  
+✅ **Credenciais seguras**: Key Vault para senhas  
+✅ **Banco gerenciado**: MySQL Flexible Server PaaS  
+✅ **Alta disponibilidade**: ACI com restart policy Always
+
+## 🔍 Comandos Úteis
+
+### Ver logs do container
+```bash
+az container logs -g rg-sprint4-rm558253 -n aci-sprint4-rm558253
+```
+
+### Ver status da aplicação
+```bash
+az container show -g rg-sprint4-rm558253 -n aci-sprint4-rm558253
+```
+
+### Conectar ao MySQL
+```bash
+mysql -h mysql-sprint4-rm558253.mysql.database.azure.com -u adminuser -p sprint4
+```
+
+### Listar recursos criados
+```bash
+az resource list -g rg-sprint4-rm558253 -o table
+```
+
+## 📝 Arquivos que PODEM ser Deletados
+
+Estes arquivos são da Sprint 3 e NÃO são mais necessários:
+
+```bash
+# Scripts antigos
+build.sh
+deploy.sh
+delete.sh
+
+# Arquivo de import MongoDB (não usado)
+import-mongodb.js
+```
+
+## 🎓 Informações para Entrega
+
+### Links Obrigatórios no PDF:
+1. **GitHub**: [URL do repositório]
+2. **Azure DevOps**: [URL do projeto Azure DevOps]
+3. **YouTube**: [URL do vídeo demonstrativo]
+
+### Informações do Projeto Azure DevOps:
+- **Nome**: Sprint 4 - Azure DevOps
+- **Visibilidade**: Private
+- **Version Control**: Git
+- **Work Item Process**: Scrum
+
+### Convidar Professor:
+1. Azure DevOps → Project Settings → Teams
+2. Add → Email do professor
+3. Role: Contributor (ou superior)
+
+---
+
+**Desenvolvido com ☕ e dedicação para FIAP - DevOps Tools & Cloud Computing**  
+**Sprint 4 - RM558253 - Luccas de Alencar Rufino**

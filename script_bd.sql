@@ -1,9 +1,10 @@
 -- Script de criação do banco e carga inicial (MySQL 8)
 -- Executar no MySQL do ACI antes de iniciar a aplicação (ou na primeira vez)
 
+-- Sprint 4 FIAP - RM558253
 -- Ajuste o nome do schema conforme variáveis de ambiente (DB_NAME)
-CREATE DATABASE IF NOT EXISTS `sprint3` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `sprint3`;
+CREATE DATABASE IF NOT EXISTS `sprint4` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `sprint4`;
 
 -- Tabelas convertidas do Oracle para MySQL
 CREATE TABLE IF NOT EXISTS usuario (

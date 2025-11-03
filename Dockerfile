@@ -13,7 +13,7 @@ WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
 ENV DB_HOST=localhost \
     DB_PORT=3306 \
-    DB_NAME=sprint3 \
+    DB_NAME=sprint4 \
     DB_USER=root \
     DB_PASSWORD=password
 USER appuser
