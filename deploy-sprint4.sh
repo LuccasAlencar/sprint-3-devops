@@ -82,16 +82,21 @@ ACR_LOGIN_SERVER="${ACR_NAME}.azurecr.io"
 echo -e "${BLUE}🗄️  [3/6] Importando MySQL para ACR...${NC}"
 MYSQL_CONTAINER_NAME="mysql-sprint4-rm${RM}"
 
-# Importar imagem MySQL do Docker Hub para o ACR
-az acr import \
-    --name $ACR_NAME \
-    --source docker.io/library/mysql:8.0 \
-    --image mysql:8.0 \
-    --resource-group $RESOURCE_GROUP || {
-    echo -e "${YELLOW}⚠️  MySQL já importado${NC}"
-}
+# Usar a imagem oficial do MySQL do Microsoft Container Registry (MCR)
+MYSQL_IMAGE="mcr.microsoft.com/mysql/mysql-server:8.0"
 
-echo -e "${GREEN}✅ Imagem MySQL importada para ACR${NC}"
+echo "⬇️  Importando imagem MySQL do Microsoft Container Registry..."
+if az acr import \
+    --name $ACR_NAME \
+    --source $MYSQL_IMAGE \
+    --image mysql:8.0 \
+    --resource-group $RESOURCE_GROUP; then
+    echo -e "${GREEN}✅ Imagem MySQL importada para ACR${NC}"
+    MYSQL_IMAGE="$ACR_LOGIN_SERVER/mysql:8.0"
+else
+    echo -e "${YELLOW}⚠️  Usando imagem MySQL diretamente do MCR${NC}"
+    MYSQL_IMAGE="mcr.microsoft.com/mysql/mysql-server:8.0"
+fi
 
 # Deletar container MySQL existente se houver
 echo -e "${BLUE}📦 Criando MySQL Container...${NC}"
@@ -104,15 +109,12 @@ az container delete \
 ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query "username" -o tsv)
 ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query "passwords[0].value" -o tsv)
 
-# Criar container MySQL usando imagem do ACR
+# Criar container MySQL
 az container create \
     --resource-group $RESOURCE_GROUP \
     --name $MYSQL_CONTAINER_NAME \
-    --image $ACR_LOGIN_SERVER/mysql:8.0 \
+    --image $MYSQL_IMAGE \
     --os-type Linux \
-    --registry-login-server $ACR_LOGIN_SERVER \
-    --registry-username $ACR_USERNAME \
-    --registry-password $ACR_PASSWORD \
     --dns-name-label mysql-sprint4-rm${RM} \
     --ports 3306 \
     --cpu 1 \
@@ -120,6 +122,7 @@ az container create \
     --environment-variables \
         MYSQL_ROOT_PASSWORD=$MYSQL_PASSWORD \
         MYSQL_DATABASE=$MYSQL_DB \
+        MYSQL_ROOT_HOST='%' \
     --location $LOCATION
 
 MYSQL_HOST=$(az container show \
