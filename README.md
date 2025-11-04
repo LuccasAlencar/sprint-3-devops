@@ -1,6 +1,8 @@
 # Sprint 4 FIAP - DevOps Tools & Cloud Computing
 
+**RM556152 - Daniel da Silva Barros**
 **RM558253 - Luccas de Alencar Rufino**
+**5550063  - Raul Clauson**
 
 Sistema de gerenciamento de motos desenvolvido com **Spring Boot**, **MySQL** na nuvem e **Azure DevOps** com pipeline CI/CD completo, deployado em **Azure Container Instance (ACI)**.
 
@@ -47,20 +49,20 @@ Sistema de gerenciamento de motos desenvolvido com **Spring Boot**, **MySQL** na
 ### Componentes
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                      Azure DevOps                             │
-│  ┌────────────┐   ┌────────────┐   ┌─────────────────┐      │
-│  │   BUILD    │ → │   IMAGE    │ → │     DEPLOY      │      │
-│  │  + Tests   │   │ Docker ACR │   │   Azure ACI     │      │
-│  └────────────┘   └────────────┘   └─────────────────┘      │
+│                      Azure DevOps                            │
+│  ┌────────────┐   ┌────────────┐   ┌─────────────────┐       │
+│  │   BUILD    │ → │   IMAGE    │ → │     DEPLOY      │       │
+│  │  + Tests   │   │ Docker ACR │   │   Azure ACI     │       │
+│  └────────────┘   └────────────┘   └─────────────────┘       │
 └──────────────────────────────────────────────────────────────┘
                               ↓
 ┌──────────────────────────────────────────────────────────────┐
-│                      Azure Cloud                              │
-│  ┌────────────────┐  ┌──────────────────┐  ┌──────────────┐ │
-│  │ Container Reg  │  │ Container Inst.  │  │  MySQL ACI   │ │
-│  │     (ACR)      │  │  App Container   │  │  MySQL 8.0   │ │
-│  │                │  │  - App:8080      │  │   Server     │ │
-│  └────────────────┘  └──────────────────┘  └──────────────┘ │
+│                      Azure Cloud                             │
+│  ┌────────────────┐  ┌──────────────────┐  ┌──────────────┐  │
+│  │ Container Reg  │  │ Container Inst.  │  │  MySQL ACI   │  │
+│  │     (ACR)      │  │  App Container   │  │  MySQL 8.0   │  │
+│  │                │  │  - App:8080      │  │   Server     │  │
+│  └────────────────┘  └──────────────────┘  └──────────────┘  │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -152,7 +154,7 @@ Para deletar TUDO:
 No arquivo `azure-pipelines.yml`, ajuste:
 ```yaml
 variables:
-  ACR_NAME: 'acrsprint4rm558253'  # Seu ACR
+  ACR_NAME: 'acrsprint4rm558253' 
   resourceGroup: 'rg-sprint4-rm558253'
   mysqlServerName: 'mysql-sprint4-rm558253'
 ```
@@ -399,4 +401,6 @@ az login
 ---
 
 **Desenvolvido com ☕ e dedicação para FIAP - DevOps Tools & Cloud Computing**  
-**Sprint 4 - RM558253 - Luccas de Alencar Rufino**
+**RM556152 - Daniel da Silva Barros**
+**RM558253 - Luccas de Alencar Rufino**
+**5550063  - Raul Clauson**

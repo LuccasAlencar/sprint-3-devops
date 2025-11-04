@@ -1,5 +1,4 @@
 #!/bin/bash
-# Sprint 4 FIAP - RM558253
 # Script para deletar todos os recursos do Azure
 
 set -e
@@ -12,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${RED}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${RED}║  Sprint 4 FIAP - Delete Azure Resources                 ║${NC}"
+echo -e "${RED}║  Sprint 4 FIAP - Delete Azure Resources                  ║${NC}"
 echo -e "${RED}║  RM558253                                                ║${NC}"
 echo -e "${RED}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""

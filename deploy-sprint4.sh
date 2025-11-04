@@ -1,7 +1,6 @@
 #!/bin/bash
-# Sprint 4 FIAP - RM558253
-# Script de deploy SIMPLIFICADO (sem Key Vault)
-# Cria todos os recursos necessários: Resource Group, ACR, MySQL e ACI
+
+# O script cria todos os recursos necessários: Resource Group, ACR, MySQL e ACI
 
 set -e
 
@@ -10,10 +9,10 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m' 
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║  Sprint 4 FIAP - Deploy Azure (SIMPLIFICADO)            ║${NC}"
+echo -e "${BLUE}║  Sprint 4 FIAP - Deploy Azure (SIMPLIFICADO)             ║${NC}"
 echo -e "${BLUE}║  RM558253 - Sem Key Vault                                ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
@@ -21,7 +20,7 @@ echo ""
 # Configurações
 RM="558253"
 RESOURCE_GROUP="rg-sprint4-rm${RM}"
-LOCATION="westeurope"  # Europa Ocidental (melhor disponibilidade)
+LOCATION="westeurope"  
 ACR_NAME="acrsprint4rm${RM}"
 MYSQL_SERVER="mysql-sprint4-rm${RM}"
 MYSQL_DB="sprint4"
@@ -30,7 +29,7 @@ ACI_NAME="aci-sprint4-rm${RM}"
 IMAGE_NAME="sprint4-app"
 DNS_LABEL="sprint4-rm${RM}"
 
-# Gerar senha MySQL (fixa para facilitar)
+# Gerar senha MySQL
 MYSQL_PASSWORD="Sprint4@RM${RM}Fiap"
 
 echo -e "${YELLOW}📋 Configurações:${NC}"
@@ -155,7 +154,7 @@ echo -e "${BLUE}💾 [5/6] Executando script SQL...${NC}"
 echo "Aguardando MySQL estar pronto (60 segundos)..."
 sleep 60
 
-# Executar script SQL via docker (funciona em qualquer ambiente)
+# Executar script SQL via docker
 docker run --rm -i mysql:8.0 mysql \
     -h $MYSQL_HOST \
     -u root \
@@ -216,7 +215,7 @@ echo ""
 
 # Informações finais
 echo -e "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  🎉 DEPLOY CONCLUÍDO COM SUCESSO!                       ║${NC}"
+echo -e "${GREEN}║  🎉 DEPLOY CONCLUÍDO COM SUCESSO!                        ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${BLUE}📋 INFORMAÇÕES DO DEPLOY:${NC}"
