@@ -1,29 +1,29 @@
 # Pipeline CI/CD para Azure DevOps
 # Deploy em Azure Container Instance (ACI)
-
+ 
 trigger:
   branches:
     include:
       - main
       - master
-
+ 
 pool:
   vmImage: 'ubuntu-latest'
-
+ 
 variables:
   # Configurações do Azure - AJUSTE AQUI
-  azureSubscription: 'azure-service-connection' 
+  azureSubscription: 'azure-service-connection'
   resourceGroup: 'rg-sprint4-rm558253'
   location: 'westeurope'
   acrName: 'acrsprint4rm558253'
   aciName: 'aci-sprint4-rm558253'
   imageName: 'sprint4-app'
   tag: '$(Build.BuildId)'
-  
+ 
   # Configurações do banco de dados
   mysqlServerName: 'mysql-sprint4-rm558253'
   mysqlDatabase: 'sprint4'
-
+ 
 stages:
   # STAGE 1: BUILD - Compilação e Testes
   - stage: Build
@@ -47,21 +47,21 @@ stages:
               mavenAuthenticateFeed: false
               effectivePomSkip: false
               sonarQubeRunAnalysis: false
-
+ 
           - task: CopyFiles@2
             displayName: 'Copiar Artefatos'
             inputs:
               SourceFolder: '$(Build.SourcesDirectory)/target'
               Contents: '*.jar'
               TargetFolder: '$(Build.ArtifactStagingDirectory)'
-
+ 
           - task: PublishBuildArtifacts@1
             displayName: 'Publicar Artefatos'
             inputs:
               PathtoPublish: '$(Build.ArtifactStagingDirectory)'
               ArtifactName: 'drop'
               publishLocation: 'Container'
-
+ 
   # STAGE 2: IMAGE - Build e Push da Imagem Docker
   - stage: Image
     displayName: 'Build e Push Docker Image'
@@ -71,28 +71,19 @@ stages:
       - job: DockerJob
         displayName: 'Build Docker Image'
         steps:
-          - task: AzureCLI@2
-            displayName: 'Build e Push Docker Image'
+          - task: Docker@2
+            displayName: 'Build and Push to ACR'
             inputs:
-              azureSubscription: '$(azureSubscription)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                echo "🐳 Login no Azure Container Registry..."
-                az acr login --name $(acrName)
-                
-                echo "🏗️  Build da imagem Docker..."
-                docker build -t $(acrName).azurecr.io/$(imageName):$(tag) .
-                docker tag $(acrName).azurecr.io/$(imageName):$(tag) $(acrName).azurecr.io/$(imageName):latest
-                
-                echo "📤 Push da imagem para ACR..."
-                docker push $(acrName).azurecr.io/$(imageName):$(tag)
-                docker push $(acrName).azurecr.io/$(imageName):latest
-                
-                echo "✅ Imagem publicada com sucesso!"
-                echo "   - $(acrName).azurecr.io/$(imageName):$(tag)"
-                echo "   - $(acrName).azurecr.io/$(imageName):latest"
-
+              containerRegistry: '$(azureSubscription)'
+              repository: '$(imageName)'
+              command: 'buildAndPush'
+              Dockerfile: '**/Dockerfile'
+              tags: |
+                $(tag)
+                latest
+              addPipelineData: false
+              addBaseImageData: false
+ 
   # STAGE 3: DEPLOY - Deploy para Azure Container Instance
   - stage: Deploy
     displayName: 'Deploy to Azure ACI'
@@ -114,31 +105,31 @@ stages:
                     scriptLocation: 'inlineScript'
                     inlineScript: |
                       echo "🚀 Iniciando deploy no Azure Container Instance..."
-                      
+                     
                       # Obter credenciais do banco (MySQL Container)
                       DB_HOST=$(az container show \
                         --resource-group $(resourceGroup) \
                         --name mysql-sprint4-rm558253 \
                         --query "ipAddress.fqdn" -o tsv 2>/dev/null || echo "localhost")
-                      
+                     
                       # Senha padrão
                       DB_PASSWORD="Sprint4@RM558253Fiap"
-                      
+                     
                       # Obter credenciais do ACR
                       ACR_USERNAME=$(az acr credential show \
                         --name $(acrName) \
                         --query "username" -o tsv)
-                      
+                     
                       ACR_PASSWORD=$(az acr credential show \
                         --name $(acrName) \
                         --query "passwords[0].value" -o tsv)
-                      
+                     
                       # Deletar container existente se houver
                       az container delete \
                         --resource-group $(resourceGroup) \
                         --name $(aciName) \
                         --yes 2>/dev/null || true
-                      
+                     
                       # Deploy no ACI
                       az container create \
                         --resource-group $(resourceGroup) \
@@ -160,10 +151,10 @@ stages:
                           DB_PASSWORD=$DB_PASSWORD \
                         --restart-policy Always \
                         --location $(location)
-                      
+                     
                       echo "✅ Deploy concluído!"
                       echo "🌐 URL: http://sprint4-rm558253.$(location).azurecontainer.io:8080"
-
+ 
                 - task: AzureCLI@2
                   displayName: 'Verificar Status do Deploy'
                   inputs:
@@ -177,8 +168,9 @@ stages:
                         --name $(aciName) \
                         --query "{Status:instanceView.state, FQDN:ipAddress.fqdn, IP:ipAddress.ip}" \
                         -o table
-                      
+                     
                       echo "📋 Logs do container (últimas linhas):"
                       az container logs \
                         --resource-group $(resourceGroup) \
                         --name $(aciName) | tail -n 50
+ 
