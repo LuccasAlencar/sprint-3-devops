@@ -78,8 +78,12 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                echo "🐳 Login no Azure Container Registry..."
-                az acr login --name $(acrName) --expose-token --output tsv --query accessToken | docker login $(acrName).azurecr.io -u 00000000-0000-0000-0000-000000000000 --password-stdin
+                echo "🐳 Obtendo credenciais do ACR..."
+                ACR_USERNAME=$(az acr credential show --name $(acrName) --query "username" -o tsv)
+                ACR_PASSWORD=$(az acr credential show --name $(acrName) --query "passwords[0].value" -o tsv)
+                
+                echo "🔑 Fazendo login no ACR..."
+                echo $ACR_PASSWORD | docker login $(acrName).azurecr.io -u $ACR_USERNAME --password-stdin
                 
                 echo "🏗️  Build da imagem Docker..."
                 docker build -t $(acrName).azurecr.io/$(imageName):$(tag) .
