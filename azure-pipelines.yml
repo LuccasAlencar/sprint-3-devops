@@ -179,8 +179,7 @@ stages:
                         --query "{Status:instanceView.state, FQDN:ipAddress.fqdn, IP:ipAddress.ip}" \
                         -o table
                       
-                      echo "📋 Logs do container:"
+                      echo "📋 Logs do container (últimas linhas):"
                       az container logs \
                         --resource-group $(resourceGroup) \
-                        --name $(aciName) \
-                        --tail 50
+                        --name $(aciName) | tail -n 50
