@@ -13,7 +13,6 @@ NC='\033[0m'
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║  Sprint 4 FIAP - Deploy Azure (SIMPLIFICADO)             ║${NC}"
-echo -e "${BLUE}║  RM558253 - Sem Key Vault                                ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
