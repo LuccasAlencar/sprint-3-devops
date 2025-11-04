@@ -71,18 +71,27 @@ stages:
       - job: DockerJob
         displayName: 'Build Docker Image'
         steps:
-          - task: Docker@2
-            displayName: 'Build and Push to ACR'
+          - task: AzureCLI@2
+            displayName: 'Build e Push Docker Image'
             inputs:
-              containerRegistry: '$(azureSubscription)'
-              repository: '$(imageName)'
-              command: 'buildAndPush'
-              Dockerfile: '**/Dockerfile'
-              tags: |
-                $(tag)
-                latest
-              addPipelineData: false
-              addBaseImageData: false
+              azureSubscription: '$(azureSubscription)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "🐳 Login no Azure Container Registry..."
+                az acr login --name $(acrName) --expose-token --output tsv --query accessToken | docker login $(acrName).azurecr.io -u 00000000-0000-0000-0000-000000000000 --password-stdin
+                
+                echo "🏗️  Build da imagem Docker..."
+                docker build -t $(acrName).azurecr.io/$(imageName):$(tag) .
+                docker tag $(acrName).azurecr.io/$(imageName):$(tag) $(acrName).azurecr.io/$(imageName):latest
+                
+                echo "📤 Push da imagem para ACR..."
+                docker push $(acrName).azurecr.io/$(imageName):$(tag)
+                docker push $(acrName).azurecr.io/$(imageName):latest
+                
+                echo "✅ Imagem publicada com sucesso!"
+                echo "   - $(acrName).azurecr.io/$(imageName):$(tag)"
+                echo "   - $(acrName).azurecr.io/$(imageName):latest"
  
   # STAGE 3: DEPLOY - Deploy para Azure Container Instance
   - stage: Deploy
