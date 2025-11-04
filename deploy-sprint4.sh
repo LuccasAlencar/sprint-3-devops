@@ -21,7 +21,7 @@ echo ""
 # Configurações
 RM="558253"
 RESOURCE_GROUP="rg-sprint4-rm${RM}"
-LOCATION="eastus"
+LOCATION="westeurope"  # Europa Ocidental (melhor disponibilidade)
 ACR_NAME="acrsprint4rm${RM}"
 MYSQL_SERVER="mysql-sprint4-rm${RM}"
 MYSQL_DB="sprint4"
@@ -77,38 +77,64 @@ else
 fi
 echo ""
 
-# 3. Criar MySQL Flexible Server
-echo -e "${BLUE}🗄️  [3/6] Criando MySQL Flexible Server...${NC}"
-if az mysql flexible-server show --name $MYSQL_SERVER --resource-group $RESOURCE_GROUP &> /dev/null; then
-    echo -e "${YELLOW}⚠️  MySQL Server já existe${NC}"
-else
-    az mysql flexible-server create \
-        --resource-group $RESOURCE_GROUP \
-        --name $MYSQL_SERVER \
-        --location $LOCATION \
-        --admin-user $MYSQL_USER \
-        --admin-password "$MYSQL_PASSWORD" \
-        --sku-name Standard_B1ms \
-        --tier Burstable \
-        --storage-size 32 \
-        --version 8.0.21 \
-        --public-access 0.0.0.0-255.255.255.255 \
-        --backup-retention 7
-    echo -e "${GREEN}✅ MySQL Server criado${NC}"
-fi
+# Definir variáveis do ACR
+ACR_LOGIN_SERVER="${ACR_NAME}.azurecr.io"
 
-# Criar database
-echo -e "${BLUE}📊 Criando database...${NC}"
-az mysql flexible-server db create \
+# 3. Importar MySQL para ACR e Criar Container
+echo -e "${BLUE}🗄️  [3/6] Importando MySQL para ACR...${NC}"
+MYSQL_CONTAINER_NAME="mysql-sprint4-rm${RM}"
+
+# Importar imagem MySQL do Docker Hub para o ACR
+az acr import \
+    --name $ACR_NAME \
+    --source docker.io/library/mysql:8.0 \
+    --image mysql:8.0 \
+    --resource-group $RESOURCE_GROUP || {
+    echo -e "${YELLOW}⚠️  MySQL já importado${NC}"
+}
+
+echo -e "${GREEN}✅ Imagem MySQL importada para ACR${NC}"
+
+# Deletar container MySQL existente se houver
+echo -e "${BLUE}📦 Criando MySQL Container...${NC}"
+az container delete \
     --resource-group $RESOURCE_GROUP \
-    --server-name $MYSQL_SERVER \
-    --database-name $MYSQL_DB || true
-echo -e "${GREEN}✅ Database criado${NC}"
+    --name $MYSQL_CONTAINER_NAME \
+    --yes 2>/dev/null || true
+
+# Obter credenciais do ACR
+ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query "username" -o tsv)
+ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query "passwords[0].value" -o tsv)
+
+# Criar container MySQL usando imagem do ACR
+az container create \
+    --resource-group $RESOURCE_GROUP \
+    --name $MYSQL_CONTAINER_NAME \
+    --image $ACR_LOGIN_SERVER/mysql:8.0 \
+    --os-type Linux \
+    --registry-login-server $ACR_LOGIN_SERVER \
+    --registry-username $ACR_USERNAME \
+    --registry-password $ACR_PASSWORD \
+    --dns-name-label mysql-sprint4-rm${RM} \
+    --ports 3306 \
+    --cpu 1 \
+    --memory 2 \
+    --environment-variables \
+        MYSQL_ROOT_PASSWORD=$MYSQL_PASSWORD \
+        MYSQL_DATABASE=$MYSQL_DB \
+    --location $LOCATION
+
+MYSQL_HOST=$(az container show \
+    --resource-group $RESOURCE_GROUP \
+    --name $MYSQL_CONTAINER_NAME \
+    --query "ipAddress.fqdn" -o tsv)
+
+echo -e "${GREEN}✅ MySQL Container criado${NC}"
+echo -e "${YELLOW}   Host: $MYSQL_HOST${NC}"
 echo ""
 
 # 4. Build e Push da imagem Docker
 echo -e "${BLUE}🏗️  [4/6] Build da imagem Docker...${NC}"
-ACR_LOGIN_SERVER="${ACR_NAME}.azurecr.io"
 
 # Login no ACR
 az acr login --name $ACR_NAME
@@ -125,19 +151,29 @@ echo ""
 
 # 5. Executar script SQL no MySQL
 echo -e "${BLUE}💾 [5/6] Executando script SQL...${NC}"
-MYSQL_HOST=$(az mysql flexible-server show \
-    --resource-group $RESOURCE_GROUP \
-    --name $MYSQL_SERVER \
-    --query "fullyQualifiedDomainName" -o tsv)
 
-echo "Aguardando MySQL estar pronto..."
-sleep 30
+echo "Aguardando MySQL estar pronto (60 segundos)..."
+sleep 60
 
-mysql -h $MYSQL_HOST -u $MYSQL_USER -p"$MYSQL_PASSWORD" < script_bd.sql 2>/dev/null || {
-    echo -e "${YELLOW}⚠️  Erro ao executar script SQL. Você pode executar manualmente depois:${NC}"
-    echo "   mysql -h $MYSQL_HOST -u $MYSQL_USER -p'$MYSQL_PASSWORD' < script_bd.sql"
+# Executar script SQL via docker (funciona em qualquer ambiente)
+docker run --rm -i mysql:8.0 mysql \
+    -h $MYSQL_HOST \
+    -u root \
+    -p"$MYSQL_PASSWORD" \
+    < script_bd.sql 2>/dev/null && {
+    echo -e "${GREEN}✅ Script SQL executado${NC}"
+} || {
+    echo -e "${YELLOW}⚠️  Aguarde mais 30 segundos para o MySQL iniciar...${NC}"
+    sleep 30
+    docker run --rm -i mysql:8.0 mysql \
+        -h $MYSQL_HOST \
+        -u root \
+        -p"$MYSQL_PASSWORD" \
+        < script_bd.sql && echo -e "${GREEN}✅ Script SQL executado${NC}" || {
+        echo -e "${YELLOW}⚠️  Execute manualmente depois:${NC}"
+        echo "   docker run --rm -i mysql:8.0 mysql -h $MYSQL_HOST -u root -p'$MYSQL_PASSWORD' < script_bd.sql"
+    }
 }
-echo -e "${GREEN}✅ Script SQL executado${NC}"
 echo ""
 
 # 6. Deploy no Azure Container Instance
@@ -158,6 +194,7 @@ az container create \
     --resource-group $RESOURCE_GROUP \
     --name $ACI_NAME \
     --image $ACR_LOGIN_SERVER/$IMAGE_NAME:latest \
+    --os-type Linux \
     --registry-login-server $ACR_LOGIN_SERVER \
     --registry-username $ACR_USERNAME \
     --registry-password $ACR_PASSWORD \
@@ -169,7 +206,7 @@ az container create \
         DB_HOST=$MYSQL_HOST \
         DB_PORT=3306 \
         DB_NAME=$MYSQL_DB \
-        DB_USER=$MYSQL_USER \
+        DB_USER=root \
         DB_PASSWORD=$MYSQL_PASSWORD \
     --restart-policy Always \
     --location $LOCATION

@@ -15,8 +15,7 @@ Sistema de gerenciamento de motos desenvolvido com **Spring Boot**, **MySQL** na
 - **Docker** - Containerização
 - **Azure Container Registry (ACR)** - Armazenamento de imagens Docker
 - **Azure Container Instances (ACI)** - Hospedagem da aplicação
-- **Azure MySQL Flexible Server** - Banco de dados gerenciado
-- **Azure Key Vault** - Armazenamento seguro de credenciais
+- **MySQL 8.0** - Banco de dados em container ACI
 - **Azure DevOps** - Pipeline CI/CD com YAML
 
 ## 🗄️ Estrutura do Banco de Dados
@@ -58,13 +57,10 @@ Sistema de gerenciamento de motos desenvolvido com **Spring Boot**, **MySQL** na
 ┌──────────────────────────────────────────────────────────────┐
 │                      Azure Cloud                              │
 │  ┌────────────────┐  ┌──────────────────┐  ┌──────────────┐ │
-│  │ Container Reg  │  │ Container Inst.  │  │  MySQL PaaS  │ │
-│  │     (ACR)      │  │     (ACI)        │  │   Flexible   │ │
+│  │ Container Reg  │  │ Container Inst.  │  │  MySQL ACI   │ │
+│  │     (ACR)      │  │  App Container   │  │  MySQL 8.0   │ │
 │  │                │  │  - App:8080      │  │   Server     │ │
 │  └────────────────┘  └──────────────────┘  └──────────────┘ │
-│  ┌────────────────┐                                          │
-│  │  Key Vault     │ ← Credenciais seguras                    │
-│  └────────────────┘                                          │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -95,18 +91,18 @@ chmod +x deploy-sprint4.sh delete-sprint4.sh
 **O script cria automaticamente:**
 - ✅ Resource Group
 - ✅ Azure Container Registry (ACR)
-- ✅ MySQL Flexible Server na nuvem
-- ✅ Key Vault com credenciais
+- ✅ MySQL Container (ACI com MySQL 8.0 oficial)
 - ✅ Build e push da imagem Docker
 - ✅ Execução do script SQL
-- ✅ Azure Container Instance (ACI)
+- ✅ Application Container (ACI)
+- ✅ Salva credenciais em `.mysql-credentials`
 
 #### 3. Acesso à Aplicação
 
 Após o deploy (5-10 minutos), você verá:
 
 ```
-🌐 URL da Aplicação: http://sprint4-rm558253.eastus.azurecontainer.io:8080
+🌐 URL da Aplicação: http://sprint4-rm558253.westeurope.azurecontainer.io:8080
 ```
 
 Acesse com:
@@ -308,7 +304,7 @@ O sistema vem com dados pré-configurados:
 ✅ **1. Descrição da solução** - Stack tecnológica documentada  
 ✅ **2. Diagrama de Arquitetura + Fluxo CI/CD** - Diagrama ASCII incluído  
 ✅ **3. Detalhamento dos componentes** - README completo  
-✅ **4. Banco de Dados válido** - MySQL Flexible Server na nuvem  
+✅ **4. Banco de Dados válido** - MySQL 8.0 em Container ACI (imagem oficial)  
 ✅ **5. Configuração do projeto no Azure DevOps** - Projeto privado, Git, Scrum  
 ✅ **6. Convite ao professor** - Acesso pode ser concedido no portal Azure DevOps  
 ✅ **7. Pipelines CI/CD funcionando** (30 pontos):
@@ -341,9 +337,9 @@ O sistema vem com dados pré-configurados:
 
 ✅ **Docker multi-stage**: Build otimizado  
 ✅ **Container não-root**: Usuário `appuser` (UID 10001)  
-✅ **Credenciais seguras**: Key Vault para senhas  
-✅ **Banco gerenciado**: MySQL Flexible Server PaaS  
-✅ **Alta disponibilidade**: ACI com restart policy Always
+✅ **Banco na nuvem**: MySQL 8.0 oficial em Container ACI  
+✅ **Alta disponibilidade**: ACI com restart policy Always  
+✅ **Automação completa**: Scripts .sh para deploy e limpeza
 
 ## 🔍 Comandos Úteis
 
@@ -367,18 +363,19 @@ mysql -h mysql-sprint4-rm558253.mysql.database.azure.com -u adminuser -p sprint4
 az resource list -g rg-sprint4-rm558253 -o table
 ```
 
-## 📝 Arquivos que PODEM ser Deletados
+## 🚀 Início Rápido
 
-Estes arquivos são da Sprint 3 e NÃO são mais necessários:
+Para executar o projeto, consulte: **[COMO-EXECUTAR.md](COMO-EXECUTAR.md)**
 
 ```bash
-# Scripts antigos
-build.sh
-deploy.sh
-delete.sh
+# Login no Azure
+az login
 
-# Arquivo de import MongoDB (não usado)
-import-mongodb.js
+# Deploy completo
+./deploy-sprint4.sh
+
+# Deletar tudo
+./delete-sprint4.sh
 ```
 
 ## 🎓 Informações para Entrega

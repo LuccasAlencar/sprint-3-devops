@@ -15,7 +15,7 @@ variables:
   # Configurações do Azure - AJUSTE AQUI
   azureSubscription: 'azure-service-connection'  # Nome da sua service connection ARM
   resourceGroup: 'rg-sprint4-rm558253'
-  location: 'eastus'
+  location: 'westeurope'
   acrName: 'acrsprint4rm558253'
   aciName: 'aci-sprint4-rm558253'
   imageName: 'sprint4-app'
@@ -116,13 +116,13 @@ stages:
                     inlineScript: |
                       echo "🚀 Iniciando deploy no Azure Container Instance..."
                       
-                      # Obter credenciais do banco
-                      DB_HOST=$(az mysql flexible-server show \
+                      # Obter credenciais do banco (MySQL Container)
+                      DB_HOST=$(az container show \
                         --resource-group $(resourceGroup) \
-                        --name $(mysqlServerName) \
-                        --query "fullyQualifiedDomainName" -o tsv 2>/dev/null || echo "localhost")
+                        --name mysql-sprint4-rm558253 \
+                        --query "ipAddress.fqdn" -o tsv 2>/dev/null || echo "localhost")
                       
-                      # Senha padrão (use Key Vault em produção)
+                      # Senha padrão
                       DB_PASSWORD="Sprint4@RM558253Fiap"
                       
                       # Obter credenciais do ACR
@@ -145,6 +145,7 @@ stages:
                         --resource-group $(resourceGroup) \
                         --name $(aciName) \
                         --image $(acrName).azurecr.io/$(imageName):$(tag) \
+                        --os-type Linux \
                         --registry-login-server $(acrName).azurecr.io \
                         --registry-username $ACR_USERNAME \
                         --registry-password $ACR_PASSWORD \
@@ -156,7 +157,7 @@ stages:
                           DB_HOST=$DB_HOST \
                           DB_PORT=3306 \
                           DB_NAME=$(mysqlDatabase) \
-                          DB_USER=adminuser \
+                          DB_USER=root \
                           DB_PASSWORD=$DB_PASSWORD \
                         --restart-policy Always \
                         --location $(location)
