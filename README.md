@@ -11,16 +11,22 @@ Sistema de gerenciamento de motos desenvolvido com **Spring Boot**, **MySQL** na
 - **Spring Boot 3.5.6** - Framework principal
 - **Thymeleaf** - Template engine para frontend
 - **Spring Security** - Autenticação e autorização
-- **MySQL 8.0** - Banco de dados na nuvem
+- **Azure Database for MySQL 8.0** - Banco de dados gerenciado (PaaS)
 - **Bootstrap 5** - Framework CSS
 - **Maven** - Gerenciamento de dependências
 - **Docker** - Containerização
 - **Azure Container Registry (ACR)** - Armazenamento de imagens Docker
 - **Azure Container Instances (ACI)** - Hospedagem da aplicação
-- **MySQL 8.0** - Banco de dados em container ACI
-- **Azure DevOps** - Pipeline CI/CD com YAML
+- **Azure DevOps** - Pipeline CI/CD com YAML e Variable Groups
 
-## 🗄️ Estrutura do Banco de Dados
+## 🗄️ Banco de Dados - Azure Database for MySQL
+
+### Serviço Utilizado
+**Azure Database for MySQL - Flexible Server (PaaS)**
+- Versão: MySQL 8.0.21
+- SKU: Standard_B1ms (Burstable tier)
+- Storage: 32 GB
+- SSL: Obrigatório (--ssl-mode=REQUIRED)
 
 ### Tabelas Principais
 - `usuario` - Usuários do sistema com roles
@@ -54,15 +60,21 @@ Sistema de gerenciamento de motos desenvolvido com **Spring Boot**, **MySQL** na
 │  │   BUILD    │ → │   IMAGE    │ → │     DEPLOY      │       │
 │  │  + Tests   │   │ Docker ACR │   │   Azure ACI     │       │
 │  └────────────┘   └────────────┘   └─────────────────┘       │
+│  📦 Variable Groups (sprint4-secrets) - Senhas seguras       │
 └──────────────────────────────────────────────────────────────┘
                               ↓
 ┌──────────────────────────────────────────────────────────────┐
 │                      Azure Cloud                             │
 │  ┌────────────────┐  ┌──────────────────┐  ┌──────────────┐  │
-│  │ Container Reg  │  │ Container Inst.  │  │  MySQL ACI   │  │
-│  │     (ACR)      │  │  App Container   │  │  MySQL 8.0   │  │
-│  │                │  │  - App:8080      │  │   Server     │  │
+│  │ Container Reg  │  │ Container Inst.  │  │   Database   │  │
+│  │     (ACR)      │  │  App Container   │  │ MySQL (PaaS) │  │
+│  │  Docker Images │  │  - App:8080      │  │ Flexible Srv │  │
 │  └────────────────┘  └──────────────────┘  └──────────────┘  │
+│                            ↓ conecta ↓                        │
+│                      ┌──────────────────┐                     │
+│                      │ Azure DB MySQL   │                     │
+│                      │   8.0 + SSL      │                     │
+│                      └──────────────────┘                     │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -149,9 +161,27 @@ Para deletar TUDO:
 5. Service connection name: `azure-container-registry`
 6. Grant access permission to all pipelines: ✅
 
-#### C) Configurar Variáveis do Pipeline
+#### C) Configurar Variable Group com Dados Sensíveis 🔐
 
-No arquivo `azure-pipelines.yml`, ajuste:
+**IMPORTANTE:** Dados sensíveis (senhas, tokens) devem estar em Variable Groups, nunca no código!
+
+1. No menu lateral, clique em **Pipelines** → **Library**
+2. Clique em **+ Variable group**
+3. Preencha:
+   - **Variable group name:** `sprint4-secrets`
+   - **Description:** `Variáveis sensíveis do projeto Sprint 4`
+4. Clique em **+ Add** e adicione:
+   - **Name:** `MYSQL_ADMIN_PASSWORD`
+   - **Value:** `Sprint4@RM558253Fiap` (ou sua senha)
+   - 🔒 **CLIQUE NO CADEADO** para tornar secreta
+5. Clique em **Save**
+6. Na aba **Pipeline permissions**, adicione sua pipeline
+
+📚 **Guia completo:** [CONFIGURAR-VARIABLE-GROUP.md](CONFIGURAR-VARIABLE-GROUP.md)
+
+#### D) Configurar Variáveis do Pipeline
+
+No arquivo `azure-pipelines.yml`, ajuste se necessário:
 ```yaml
 variables:
   ACR_NAME: 'acrsprint4rm558253' 
@@ -159,7 +189,7 @@ variables:
   mysqlServerName: 'mysql-sprint4-rm558253'
 ```
 
-#### D) Criar Pipeline
+#### E) Criar Pipeline
 
 1. Pipelines → New pipeline
 2. Selecione: **Azure Repos Git** (ou GitHub se preferir)
@@ -173,6 +203,31 @@ variables:
 O pipeline executa automaticamente em:
 - Push na branch `main` ou `master`
 - Pull request para `main` ou `master`
+
+⚠️ **IMPORTANTE - Troubleshooting do Trigger:**
+
+Se a pipeline NÃO estiver rodando automaticamente após commits:
+
+1. **Verifique a branch padrão do repositório:**
+   - No Azure DevOps, vá em Repos → Branches
+   - Verifique se a branch padrão é `main` ou `master`
+   - O trigger está configurado para ambas
+
+2. **Verifique se o arquivo azure-pipelines.yml está na raiz:**
+   - O arquivo deve estar em `/azure-pipelines.yml`
+   - Não pode estar em subpastas
+
+3. **Verifique as permissões da pipeline:**
+   - Project Settings → Pipelines → Settings
+   - "Disable implied YAML CI trigger" deve estar **desmarcado**
+
+4. **Force o primeiro run manual:**
+   - Às vezes o Azure DevOps precisa de 1 run manual
+   - Depois disso, os triggers automáticos funcionam
+
+5. **Verifique os logs do trigger:**
+   - Na pipeline, clique nos três pontinhos (...)
+   - Triggers → veja se há erros
 
 ### 3. Stages do Pipeline
 
@@ -304,9 +359,9 @@ O sistema vem com dados pré-configurados:
 ### Obrigatórios (Todos ✅)
 
 ✅ **1. Descrição da solução** - Stack tecnológica documentada  
-✅ **2. Diagrama de Arquitetura + Fluxo CI/CD** - Diagrama ASCII incluído  
+✅ **2. Diagrama de Arquitetura + Fluxo CI/CD** - Diagrama ASCII incluído com Variable Groups  
 ✅ **3. Detalhamento dos componentes** - README completo  
-✅ **4. Banco de Dados válido** - MySQL 8.0 em Container ACI (imagem oficial)  
+✅ **4. Banco de Dados válido** - **Azure Database for MySQL 8.0 Flexible Server (PaaS)** ✅  
 ✅ **5. Configuração do projeto no Azure DevOps** - Projeto privado, Git, Scrum  
 ✅ **6. Convite ao professor** - Acesso pode ser concedido no portal Azure DevOps  
 ✅ **7. Pipelines CI/CD funcionando** (30 pontos):
@@ -339,7 +394,10 @@ O sistema vem com dados pré-configurados:
 
 ✅ **Docker multi-stage**: Build otimizado  
 ✅ **Container não-root**: Usuário `appuser` (UID 10001)  
-✅ **Banco na nuvem**: MySQL 8.0 oficial em Container ACI  
+✅ **Banco gerenciado (PaaS)**: Azure Database for MySQL 8.0 Flexible Server  
+✅ **SSL obrigatório**: Conexões criptografadas com banco de dados  
+✅ **Variable Groups**: Senhas e dados sensíveis protegidos no Azure DevOps  
+✅ **Secret Variables**: Senhas mascaradas nos logs da pipeline  
 ✅ **Alta disponibilidade**: ACI com restart policy Always  
 ✅ **Automação completa**: Scripts .sh para deploy e limpeza
 
@@ -355,9 +413,18 @@ az container logs -g rg-sprint4-rm558253 -n aci-sprint4-rm558253
 az container show -g rg-sprint4-rm558253 -n aci-sprint4-rm558253
 ```
 
-### Conectar ao MySQL
+### Conectar ao Azure Database for MySQL
 ```bash
-mysql -h mysql-sprint4-rm558253.mysql.database.azure.com -u adminuser -p sprint4
+# Obter FQDN do servidor
+az mysql flexible-server show -g rg-sprint4-rm558253 -n mysql-sprint4-rm558253 --query "fullyQualifiedDomainName" -o tsv
+
+# Conectar com mysql client (SSL obrigatório)
+mysql -h <FQDN> -u adminuser -p --ssl-mode=REQUIRED sprint4
+```
+
+### Ver logs do MySQL
+```bash
+az mysql flexible-server server-logs list -g rg-sprint4-rm558253 -n mysql-sprint4-rm558253
 ```
 
 ### Listar recursos criados

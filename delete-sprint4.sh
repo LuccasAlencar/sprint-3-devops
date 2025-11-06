@@ -45,10 +45,9 @@ echo ""
 
 # Confirmar exclusão
 echo -e "${RED}⚠️  ATENÇÃO: Todos os recursos acima serão DELETADOS!${NC}"
-echo -e "${YELLOW}   - Azure Container Instance${NC}"
+echo -e "${YELLOW}   - Azure Container Instance (Aplicação)${NC}"
 echo -e "${YELLOW}   - Azure Container Registry${NC}"
-echo -e "${YELLOW}   - MySQL Flexible Server${NC}"
-echo -e "${YELLOW}   - Key Vault${NC}"
+echo -e "${YELLOW}   - Azure Database for MySQL (Flexible Server)${NC}"
 echo -e "${YELLOW}   - Resource Group${NC}"
 echo ""
 read -p "Deseja continuar? (digite 'sim' para confirmar): " confirmacao
