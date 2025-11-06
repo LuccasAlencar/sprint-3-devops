@@ -1,29 +1,30 @@
 #!/bin/bash
 
-# O script cria todos os recursos necessários: Resource Group, ACR, Azure Database for MySQL e ACI
+# Script de Deploy Sprint 4 FIAP
+# Deploy completo: ACR, MySQL Container e ACI
 
 set -e
 
-# Cores para output
+# Cores
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
 NC='\033[0m' 
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║  Sprint 4 FIAP - Deploy Azure Database for MySQL (PaaS)  ║${NC}"
+echo -e "${BLUE}║  Sprint 4 FIAP - Deploy com MySQL Container (ACI)       ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
 # Configurações
 RM="558253"
 RESOURCE_GROUP="rg-sprint4-rm${RM}"
-LOCATION="westeurope"  
+LOCATION="eastus"
 ACR_NAME="acrsprint4rm${RM}"
-MYSQL_SERVER="mysql-sprint4-rm${RM}"
+MYSQL_CONTAINER="mysql-sprint4-rm${RM}"
 MYSQL_DB="sprint4"
-MYSQL_USER="adminuser"
+MYSQL_USER="root"
 ACI_NAME="aci-sprint4-rm${RM}"
 IMAGE_NAME="sprint4-app"
 DNS_LABEL="sprint4-rm${RM}"
@@ -35,9 +36,9 @@ echo -e "${YELLOW}📋 Configurações:${NC}"
 echo "  Resource Group: $RESOURCE_GROUP"
 echo "  Location: $LOCATION"
 echo "  ACR: $ACR_NAME"
-echo "  MySQL Server: $MYSQL_SERVER"
+echo "  MySQL Container: $MYSQL_CONTAINER"
 echo "  Database: $MYSQL_DB"
-echo "  ACI: $ACI_NAME"
+echo "  ACI App: $ACI_NAME"
 echo ""
 
 # Verificar se está logado no Azure
@@ -78,55 +79,65 @@ echo ""
 # Definir variáveis do ACR
 ACR_LOGIN_SERVER="${ACR_NAME}.azurecr.io"
 
-# 3. Criar Azure Database for MySQL Flexible Server (PaaS)
-echo -e "${BLUE}🗄️  [3/6] Criando Azure Database for MySQL (PaaS)...${NC}"
+# Aguardar ACR estar totalmente disponível
+echo -e "${BLUE}⏳ Aguardando ACR estar pronto...${NC}"
+sleep 15
 
-# Verificar se o servidor MySQL já existe
-if az mysql flexible-server show --resource-group $RESOURCE_GROUP --name $MYSQL_SERVER &> /dev/null; then
-    echo -e "${YELLOW}⚠️  Azure Database for MySQL já existe${NC}"
-else
-    # Criar MySQL Flexible Server
-    az mysql flexible-server create \
-        --resource-group $RESOURCE_GROUP \
-        --name $MYSQL_SERVER \
-        --location $LOCATION \
-        --admin-user $MYSQL_USER \
-        --admin-password "$MYSQL_PASSWORD" \
-        --sku-name Standard_B1ms \
-        --tier Burstable \
-        --storage-size 32 \
-        --version 8.0.21 \
-        --public-access 0.0.0.0-255.255.255.255 \
-        --yes
-    
-    echo -e "${GREEN}✅ Azure Database for MySQL criado${NC}"
-fi
+# 3. Importar e Criar MySQL Container
+echo -e "${BLUE}🗄️  [3/6] Criando MySQL Container...${NC}"
 
-# Obter FQDN do MySQL
-MYSQL_HOST=$(az mysql flexible-server show \
+# Login no ACR
+echo -e "${BLUE}🔐 Login no ACR...${NC}"
+az acr login --name $ACR_NAME
+echo -e "${GREEN}✅ Login realizado${NC}"
+
+# Obter credenciais do ACR
+ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query "username" -o tsv)
+ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query "passwords[0].value" -o tsv)
+
+# Importar imagem MySQL do Docker Hub
+echo -e "${BLUE}📦 Importando MySQL 8.0...${NC}"
+docker pull mysql:8.0
+docker tag mysql:8.0 $ACR_LOGIN_SERVER/mysql:8.0
+docker push $ACR_LOGIN_SERVER/mysql:8.0
+echo -e "${GREEN}✅ MySQL importado para ACR${NC}"
+
+# Deletar container MySQL existente
+az container delete \
     --resource-group $RESOURCE_GROUP \
-    --name $MYSQL_SERVER \
-    --query "fullyQualifiedDomainName" -o tsv)
+    --name $MYSQL_CONTAINER \
+    --yes 2>/dev/null || true
 
-echo -e "${GREEN}✅ MySQL Server: $MYSQL_HOST${NC}"
-echo ""
-
-# Criar database se não existir
-echo -e "${BLUE}📦 Criando database...${NC}"
-az mysql flexible-server db create \
+# Criar MySQL Container
+echo -e "${BLUE}📦 Criando MySQL Container ACI...${NC}"
+az container create \
     --resource-group $RESOURCE_GROUP \
-    --server-name $MYSQL_SERVER \
-    --database-name $MYSQL_DB 2>/dev/null || echo -e "${YELLOW}⚠️  Database já existe${NC}"
+    --name $MYSQL_CONTAINER \
+    --image $ACR_LOGIN_SERVER/mysql:8.0 \
+    --os-type Linux \
+    --registry-login-server $ACR_LOGIN_SERVER \
+    --registry-username $ACR_USERNAME \
+    --registry-password $ACR_PASSWORD \
+    --dns-name-label mysql-sprint4-rm${RM} \
+    --ports 3306 \
+    --cpu 1 \
+    --memory 2 \
+    --environment-variables \
+        MYSQL_ROOT_PASSWORD=$MYSQL_PASSWORD \
+        MYSQL_DATABASE=$MYSQL_DB \
+        MYSQL_ROOT_HOST='%' \
+    --location $LOCATION
 
-echo -e "${GREEN}✅ Database configurado${NC}"
+MYSQL_HOST=$(az container show \
+    --resource-group $RESOURCE_GROUP \
+    --name $MYSQL_CONTAINER \
+    --query "ipAddress.fqdn" -o tsv)
+
+echo -e "${GREEN}✅ MySQL Container criado: $MYSQL_HOST${NC}"
 echo ""
 
 # 4. Build e Push da imagem Docker
 echo -e "${BLUE}🏗️  [4/6] Build da imagem Docker...${NC}"
-
-# Login no ACR
-az acr login --name $ACR_NAME
-echo -e "${GREEN}✅ Login no ACR realizado${NC}"
 
 # Build da imagem
 docker build -t $ACR_LOGIN_SERVER/$IMAGE_NAME:latest .
@@ -137,53 +148,33 @@ docker push $ACR_LOGIN_SERVER/$IMAGE_NAME:latest
 echo -e "${GREEN}✅ Imagem enviada para ACR${NC}"
 echo ""
 
-# 5. Executar script SQL no Azure Database for MySQL
+# 5. Executar script SQL no MySQL Container
 echo -e "${BLUE}💾 [5/6] Executando script SQL...${NC}"
+echo "Aguardando MySQL iniciar (60 segundos)..."
+sleep 60
 
-# Verificar se mysql client está instalado
-if ! command -v mysql &> /dev/null; then
-    echo -e "${YELLOW}⚠️  Instalando MySQL client...${NC}"
-    # Para Ubuntu/Debian
-    sudo apt-get update && sudo apt-get install -y mysql-client 2>/dev/null || {
-        # Para outras distribuições
-        echo -e "${RED}❌ Instale o MySQL client manualmente${NC}"
-        echo "   Debian/Ubuntu: sudo apt-get install mysql-client"
-        echo "   RHEL/CentOS: sudo yum install mysql"
-        echo "   macOS: brew install mysql-client"
-        exit 1
-    }
-fi
-
-echo "Aguardando MySQL estar pronto (30 segundos)..."
-sleep 30
-
-# Executar script SQL conectando ao Azure Database for MySQL
-mysql -h $MYSQL_HOST \
-      -u $MYSQL_USER \
-      -p"$MYSQL_PASSWORD" \
-      --ssl-mode=REQUIRED \
-      < script_bd.sql 2>/dev/null && {
-    echo -e "${GREEN}✅ Script SQL executado com sucesso${NC}"
+docker run --rm -i $ACR_LOGIN_SERVER/mysql:8.0 mysql \
+    -h $MYSQL_HOST \
+    -u root \
+    -p"$MYSQL_PASSWORD" \
+    < script_bd.sql 2>/dev/null && {
+    echo -e "${GREEN}✅ Script SQL executado${NC}"
 } || {
-    echo -e "${YELLOW}⚠️  Aguarde mais 30 segundos para o MySQL iniciar...${NC}"
+    echo -e "${YELLOW}⚠️  Aguarde mais 30 segundos...${NC}"
     sleep 30
-    mysql -h $MYSQL_HOST \
-          -u $MYSQL_USER \
-          -p"$MYSQL_PASSWORD" \
-          --ssl-mode=REQUIRED \
-          < script_bd.sql && echo -e "${GREEN}✅ Script SQL executado${NC}" || {
-        echo -e "${YELLOW}⚠️  Execute manualmente depois:${NC}"
-        echo "   mysql -h $MYSQL_HOST -u $MYSQL_USER -p'$MYSQL_PASSWORD' --ssl-mode=REQUIRED < script_bd.sql"
+    docker run --rm -i $ACR_LOGIN_SERVER/mysql:8.0 mysql \
+        -h $MYSQL_HOST \
+        -u root \
+        -p"$MYSQL_PASSWORD" \
+        < script_bd.sql && echo -e "${GREEN}✅ Script SQL executado${NC}" || {
+        echo -e "${YELLOW}⚠️  Execute manualmente:${NC}"
+        echo "   docker run --rm -i $ACR_LOGIN_SERVER/mysql:8.0 mysql -h $MYSQL_HOST -u root -p'$MYSQL_PASSWORD' < script_bd.sql"
     }
 }
 echo ""
 
-# 6. Deploy no Azure Container Instance
-echo -e "${BLUE}🚀 [6/6] Deploy no Azure Container Instance...${NC}"
-
-# Obter credenciais do ACR
-ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query "username" -o tsv)
-ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query "passwords[0].value" -o tsv)
+# 6. Deploy da Aplicação no Azure Container Instance
+echo -e "${BLUE}🚀 [6/6] Deploy da aplicação...${NC}"
 
 # Deletar container existente se houver
 az container delete \
@@ -208,7 +199,7 @@ az container create \
         DB_HOST=$MYSQL_HOST \
         DB_PORT=3306 \
         DB_NAME=$MYSQL_DB \
-        DB_USER=$MYSQL_USER \
+        DB_USER=root \
         DB_PASSWORD=$MYSQL_PASSWORD \
     --restart-policy Always \
     --location $LOCATION
