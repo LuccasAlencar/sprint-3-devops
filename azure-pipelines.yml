@@ -22,23 +22,32 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  # Configurações do Azure (não-sensíveis)
-  azureSubscription: 'azure-service-connection'
-  resourceGroup: 'rg-sprint4-rm558253'
-  location: 'westeurope'
-  acrName: 'acrsprint4rm558253'
-  aciName: 'aci-sprint4-rm558253'
-  imageName: 'sprint4-app'
-  tag: '$(Build.BuildId)'
-  
-  # Configurações do banco de dados Azure Database for MySQL (não-sensíveis)
-  mysqlServerName: 'mysql-sprint4-rm558253'
-  mysqlDatabase: 'sprint4'
-  mysqlAdminUser: 'adminuser'
-
-# IMPORTANTE: Criar Variable Group 'sprint4-secrets' no Azure DevOps com:
-# - MYSQL_ADMIN_PASSWORD: Senha do admin do MySQL (exemplo: Sprint4@RM558253Fiap)
+  # Importar Variable Group (MYSQL_ADMIN_PASSWORD)
 - group: sprint4-secrets
+
+  # Configurações do Azure
+- name: azureSubscription
+  value: 'azure-service-connection'
+- name: resourceGroup
+  value: 'rg-sprint4-rm558253'
+- name: location
+  value: 'westeurope'
+- name: acrName
+  value: 'acrsprint4rm558253'
+- name: aciName
+  value: 'aci-sprint4-rm558253'
+- name: imageName
+  value: 'sprint4-app'
+- name: tag
+  value: '$(Build.BuildId)'
+
+  # Configurações do banco de dados Azure Database for MySQL
+- name: mysqlServerName
+  value: 'mysql-sprint4-rm558253'
+- name: mysqlDatabase
+  value: 'sprint4'
+- name: mysqlAdminUser
+  value: 'adminuser'
 
 stages:
   # STAGE 1: BUILD - Compilação e Testes
