@@ -8,7 +8,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 echo -e "${RED}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${RED}║  Sprint 4 FIAP - Delete Azure Resources                  ║${NC}"
@@ -61,7 +61,7 @@ echo ""
 echo -e "${RED}🗑️  Deletando Resource Group e todos os recursos...${NC}"
 echo "   Isso pode levar alguns minutos..."
 
-# Deletar Resource Group (remove todos os recursos)
+# Deletar Resource Group
 az group delete --name $RESOURCE_GROUP --yes --no-wait
 
 echo ""

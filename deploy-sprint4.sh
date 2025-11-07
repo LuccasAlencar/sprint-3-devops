@@ -13,7 +13,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' 
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║  Sprint 4 FIAP - Deploy com MySQL Container (ACI)       ║${NC}"
+echo -e "${BLUE}║  Sprint 4 FIAP - Deploy com MySQL Container (ACI)        ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -29,7 +29,7 @@ ACI_NAME="aci-sprint4-rm${RM}"
 IMAGE_NAME="sprint4-app"
 DNS_LABEL="sprint4-rm${RM}"
 
-# Gerar senha MySQL (use a mesma no Variable Group do Azure DevOps)
+# Gerar senha MySQL
 MYSQL_PASSWORD="Sprint4@RM${RM}Fiap"
 
 echo -e "${YELLOW}📋 Configurações:${NC}"

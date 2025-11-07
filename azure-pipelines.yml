@@ -17,7 +17,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  # Importar Variable Group (MYSQL_ADMIN_PASSWORD)
+  # Importar Variable Group
 - group: sprint4-secrets
 
   # Configurações do Azure
